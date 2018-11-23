@@ -77,7 +77,7 @@ CREATE TABLE Nominee (
   NomineeId VARCHAR(20) PRIMARY KEY,
   Name      VARCHAR(20) NOT NULL,
   Address   TEXT        NOT NULL,
-  Phone     INT /* have to fix to 10 */
+  Phone     VARCHAR(10) NOT NULL
 );
 
 DELIMITER $$
@@ -117,8 +117,8 @@ CREATE TABLE Employee (
 );
 
 CREATE TABLE BranchManager (
-  branchID VARCHAR(20) PRIMARY KEY,
-  employeeID      VARCHAR(20) NOT NULL,
+  branchID   VARCHAR(20) PRIMARY KEY,
+  employeeID VARCHAR(20) NOT NULL,
   FOREIGN KEY (employeeID) REFERENCES Employee (employeeID)
 );
 
@@ -228,11 +228,11 @@ CREATE TABLE Loan (
   loanID               INT AUTO_INCREMENT   NOT NULL,
   customerID           VARCHAR(20)          NOT NULL,
   loanType             ENUM ("1", "2", "3") NOT NULL,
-  loanAmount           DOUBLE               NOT NULL,
+  loanAmount           FLOAT(100, 4)        NOT NULL,
   startDate            DATE                 NOT NULL,
   endDate              DATE                 NOT NULL,
   nextInstallmentDate  DATE                 NOT NULL,
-  nextInstallment      DOUBLE               NOT NULL,
+  nextInstallment      FLOAT(100, 4)        NOT NULL,
   numberOfInstallments INT                  NOT NULL,
   applicationID        INT                  NOT NULL,
   PRIMARY KEY (loanID),
@@ -251,7 +251,7 @@ CREATE TABLE OnlineLoan (
 # validation for Loan table
 DELIMITER $$
 
-CREATE PROCEDURE `check_Loan`(IN loanAmount DOUBLE, IN numberOfInstallments INT, nextInstallment DOUBLE)
+CREATE PROCEDURE `check_Loan`(IN loanAmount FLOAT(100, 4), IN numberOfInstallments INT, IN nextInstallment FLOAT(100, 4))
   BEGIN
     IF loanAmount < 0
     THEN
@@ -295,10 +295,10 @@ DELIMITER ;
 # .......................
 
 CREATE TABLE LoanInstallment (
-  installmentID        INT       NOT NULL AUTO_INCREMENT,
+  installmentID        INT           NOT NULL AUTO_INCREMENT,
   loanID               INT,
-  installmentTimeStamp TIMESTAMP NOT NULL,
-  installmentAmount    DOUBLE    NOT NULL,
+  installmentTimeStamp TIMESTAMP     NOT NULL,
+  installmentAmount    FLOAT(100, 4) NOT NULL,
   PRIMARY KEY (installmentID),
   FOREIGN KEY (loanID) REFERENCES Loan (loanID)
 );
@@ -306,7 +306,7 @@ CREATE TABLE LoanInstallment (
 # validation for LoanInstallment table
 DELIMITER $$
 
-CREATE PROCEDURE `check_LoanInstallment`(IN installmentAmount DOUBLE)
+CREATE PROCEDURE `check_LoanInstallment`(IN installmentAmount FLOAT(100, 4))
   BEGIN
     IF installmentAmount < 0
     THEN
@@ -417,6 +417,66 @@ CREATE TRIGGER `parts_before_update_password`
   END$$
 DELIMITER ;
 
+
+#Adding a transaction
+DELIMITER $$
+CREATE FUNCTION check_account_balance(old_balance FLOAT(100, 4), transaction_amount FLOAT(100, 4))
+  RETURNS BOOLEAN
+DETERMINISTIC
+  BEGIN
+    DECLARE remained_amount FLOAT(100, 4);
+    SET remained_amount = (old_balance - transaction_amount);
+
+    IF remained_amount < 0
+    THEN
+      RETURN false;
+    ELSE
+      RETURN true;
+    END IF;
+  END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS `parts_before_insert_transaction_normal`;
+DROP TRIGGER IF EXISTS `parts_before_update_transaction_normal`;
+
+DELIMITER $$
+CREATE TRIGGER `parts_before_insert_transaction_normal`
+  BEFORE INSERT
+  ON `Transaction`
+  FOR EACH ROW
+  BEGIN
+    DECLARE old_balance FLOAT(100, 4);
+    SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
+    IF check_account_balance(old_balance, NEW.Amount) = true
+    THEN
+      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
+      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
+    ELSE
+      SIGNAL SQLSTATE '45002'
+      SET MESSAGE_TEXT = 'Account balance not enough to transfer';
+    END IF;
+  END$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER `parts_before_update_transaction_normal`
+  BEFORE UPDATE
+  ON `Transaction`
+  FOR EACH ROW
+  BEGIN
+    DECLARE old_balance FLOAT(100, 4);
+    SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
+    IF check_account_balance(old_balance, NEW.Amount) = true
+    THEN
+      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
+      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
+    ELSE
+      SIGNAL SQLSTATE '45002'
+      SET MESSAGE_TEXT = 'Account balance is not enough to transfer';
+    END IF;
+  END$$
+DELIMITER ;
+
 #Insert Data
 INSERT INTO `UserLogin` (`id`, `username`, `passsword`, `role`)
 VALUES ('1', 'TESTOR01', MD5('0773842106'), 'user');
@@ -426,16 +486,33 @@ FROM UserLogin
 WHERE EXISTS(SELECT passsword
              FROM UserLogin
              WHERE username = 'TESTOR01'
-               AND passsword = '58288a3889a01681b06add650dd349fa'
+               AND passsword = MD5('0773842106')
                AND role = 'user');
 
-INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`) VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
-INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
+INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
+VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
+
+INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
+VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
+
+# INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
+# VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
 
 INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
-VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
+VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
 
-INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
-VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '07738421061', 'anyone@gmail.com');
+INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
+VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
 
+INSERT INTO `BranchManager` (`branchID`, `employeeID`)
+VALUES ('BRHORANA001', 'EMP001');
+
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
+VALUES ('ACC001', 'ABC01', 'BRHORANA001', '8000.0000', 'NOM1234');
+
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
+VALUES ('ACC002', 'ABC01', 'BRHORANA001', '7000.0000', 'NOM1234');
+
+INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
 
