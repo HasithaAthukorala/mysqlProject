@@ -112,7 +112,7 @@ CREATE TABLE Employee (
   branchCode  VARCHAR(20) NOT NULL,
   firstName   varchar(20) NOT NULL,
   LastName    varchar(20) NOT NULL,
-  dateOfBirth DATE        NOT NULL,  -- should be validated
+  dateOfBirth DATE        NOT NULL,
   address     TEXT        NOT NULL,
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
 );
