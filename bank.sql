@@ -69,9 +69,10 @@ CREATE TABLE Organization (
 
 CREATE TABLE Interest (
   accountType    VARCHAR(20) PRIMARY KEY,
-  interest       FLOAT(100, 4) NOT NULL,
-  MinimumBalance FLOAT(100, 4) NOT NULL
+  interest       DECIMAL(13, 2) NOT NULL,
+  MinimumBalance DECIMAL(13, 2) NOT NULL
 );
+
 
 CREATE TABLE Nominee (
   NomineeId VARCHAR(20) PRIMARY KEY,
@@ -100,7 +101,6 @@ CREATE TRIGGER `parts_before_update_nominee`
   END$$
 DELIMITER ;
 
-
 CREATE TABLE Branch (
   branchCode      VARCHAR(20) PRIMARY KEY,
   branchName      VARCHAR(20) NOT NULL,
@@ -117,40 +117,6 @@ CREATE TABLE Employee (
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
 );
 
-DELIMITER $$
-
-CREATE PROCEDURE `check_employee_birthday`(IN dob DATE)
-  BEGIN
-    IF dob > NOW()
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Date of Birth is incorrect!';
-    end if;
-  END$$
-DELIMITER ;
-
--- before insert to employee
-DELIMITER $$
-CREATE TRIGGER `check_employee_before_insert`
-  BEFORE INSERT
-  ON `Employee`
-  FOR EACH ROW
-  BEGIN
-    CALL check_employee_birthday(new.dateOfBirth);
-  END$$
-DELIMITER ;
-
--- before update an employee
-DELIMITER $$
-CREATE TRIGGER `check_employee_before_update`
-  BEFORE UPDATE
-  ON `Employee`
-  FOR EACH ROW
-  BEGIN
-    CALL check_employee_birthday(new.dateOfBirth);
-  END$$
-DELIMITER ;
-
 CREATE TABLE BranchManager (
   branchID   VARCHAR(20) PRIMARY KEY,
   employeeID VARCHAR(20) NOT NULL,
@@ -162,7 +128,7 @@ CREATE TABLE Account (
   AccountId      VARCHAR(20) NOT NULL,
   CustomerId     VARCHAR(20)   NOT NULL,
   branchCode     VARCHAR(20)   NOT NULL,
-  AccountBalance FLOAT(100, 4) NOT NULL default 0,
+  AccountBalance DECIMAL(13, 2) NOT NULL,
   NomineeId      VARCHAR(20)   NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId),
@@ -173,7 +139,7 @@ CREATE TABLE Account (
 
 CREATE TABLE SavingsAccount (
   AccountId       VARCHAR(20) NOT NULL,
-  noOfWithdrawals INT    NOT NULL default 0,
+  noOfWithdrawals INT    NOT NULL,
   accountType     VARCHAR(20) NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (AccountId) REFERENCES Account (AccountId),
@@ -191,21 +157,20 @@ CREATE PROCEDURE `check_balance`(IN AccBalance FLOAT, IN AccId VARCHAR(20))
     IF AccBalance  < 0
     THEN
       SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Balance should not be less than zero';
+      SET MESSAGE_TEXT = 'check constraint on interest failed!';
     END IF;
-    
+
     IF minbal > AccBalance
     THEN
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Account must keep the minimal balance';
     END IF;
-  END$$
-DELIMITER ;
+  END
+$$
 
--- when updating an account balance
 DELIMITER $$
-CREATE TRIGGER `check_account_balance_when_update`
-  BEFORE UPDATE
+CREATE TRIGGER `check_account_balance`
+  BEFORE INSERT
   ON `Account`
   FOR EACH ROW
   BEGIN
@@ -213,86 +178,17 @@ CREATE TRIGGER `check_account_balance_when_update`
   END$$
 DELIMITER ;
 
-DELIMITER $$
-
-CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType VARCHAR(20))
-  BEGIN
-    IF noOfWithdrawals < 0
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Withdrawal count should be greater than zero...!';
-    END IF;
-    IF noOfWithdrawals > 5
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Withdrawal limit has been exceeded...!';
-    END IF;
-    IF !(accountType IN("Children", "Adult", "Teen", "Senior"))
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Account type is incorect...!';
-    END IF;
-  END$$
-
-DELIMITER ;
-
--- when updating an savings account
-DELIMITER $$
-CREATE TRIGGER `check_savings_account_when_update`
-  BEFORE UPDATE
-  ON `SavingsAccount`
-  FOR EACH ROW
-  BEGIN
-    CALL check_savings_account(new.noOfWithdrawals, new.accountType);
-  END$$
-DELIMITER ;
-
--- when inserting to savings account
-DELIMITER $$
-CREATE TRIGGER `check_savings_account_when_insert`
-  BEFORE INSERT
-  ON `SavingsAccount`
-  FOR EACH ROW
-  BEGIN
-    CALL check_savings_account(new.noOfWithdrawals, new.accountType);
-  END$$
-DELIMITER ;
-
-
 
 CREATE TABLE FixedDeposit (
   FDid      VARCHAR(20)   NOT NULL,
   AccountId VARCHAR(20)   NOT NULL,
   typeId    VARCHAR(20)   NOT NULL,
-  amount    FLOAT(100, 4) NOT NULL,
+  amount    DECIMAL(13, 2) NOT NULL,
   PRIMARY KEY (FDid),
   FOREIGN KEY (typeId) REFERENCES FDType (typeId),
   FOREIGN KEY (AccountId) REFERENCES SavingsAccount (AccountId)    ON DELETE CASCADE
 );
 
-DELIMITER $$
-
-CREATE PROCEDURE `check_fd_amount`(IN amount FLOAT(100,4))
-  BEGIN
-    IF amount < 0
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'FD amount should be greater than zero...!';
-    END IF;
-  END$$
-
-DELIMITER ;
-
--- when inserting to a fd
-DELIMITER $$
-CREATE TRIGGER `check_fd_when_insert`
-  BEFORE INSERT
-  ON `FixedDeposit`
-  FOR EACH ROW
-  BEGIN
-    CALL check_fd_amount(new.amount);
-  END$$
-DELIMITER ;
 
 
 CREATE TABLE Gurantor (
@@ -368,11 +264,11 @@ CREATE TABLE Loan (
   loanID               INT AUTO_INCREMENT   NOT NULL,
   customerID           VARCHAR(20)          NOT NULL,
   loanType             ENUM ("1", "2", "3") NOT NULL,
-  loanAmount           FLOAT(100, 4)        NOT NULL,
+  loanAmount           DECIMAL(13, 2)        NOT NULL,
   startDate            DATE                 NOT NULL,
   endDate              DATE                 NOT NULL,
   nextInstallmentDate  DATE                 NOT NULL,
-  nextInstallment      FLOAT(100, 4)        NOT NULL,
+  nextInstallment      DECIMAL(13, 2)       NOT NULL,
   numberOfInstallments INT                  NOT NULL,
   applicationID        INT                  NOT NULL,
   PRIMARY KEY (loanID),
@@ -391,7 +287,7 @@ CREATE TABLE OnlineLoan (
 # validation for Loan table
 DELIMITER $$
 
-CREATE PROCEDURE `check_Loan`(IN loanAmount FLOAT(100, 4), IN numberOfInstallments INT, IN nextInstallment FLOAT(100, 4))
+CREATE PROCEDURE `check_Loan`(IN loanAmount DECIMAL(13, 2), IN numberOfInstallments INT, IN nextInstallment DECIMAL(13, 2))
   BEGIN
     IF loanAmount < 0
     THEN
@@ -438,7 +334,7 @@ CREATE TABLE LoanInstallment (
   installmentID        INT           NOT NULL AUTO_INCREMENT,
   loanID               INT,
   installmentTimeStamp TIMESTAMP     NOT NULL,
-  installmentAmount    FLOAT(100, 4) NOT NULL,
+  installmentAmount    DECIMAL(13, 2) NOT NULL,
   PRIMARY KEY (installmentID),
   FOREIGN KEY (loanID) REFERENCES Loan (loanID)
 );
@@ -446,7 +342,7 @@ CREATE TABLE LoanInstallment (
 # validation for LoanInstallment table
 DELIMITER $$
 
-CREATE PROCEDURE `check_LoanInstallment`(IN installmentAmount FLOAT(100, 4))
+CREATE PROCEDURE `check_LoanInstallment`(IN installmentAmount DECIMAL(13, 2))
   BEGIN
     IF installmentAmount < 0
     THEN
@@ -483,106 +379,10 @@ CREATE TABLE ATMInformation (
   OfficerInCharge VARCHAR(20) NOT NULL,
   location        VARCHAR(20) NOT NULL,
   branchCode      VARCHAR(20) NOT NULL,
-  Amount          FLOAT(100,4) DEFAULT 0,
+  Amount          FLOAT,
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode),
   FOREIGN KEY (OfficerInCharge) REFERENCES Employee (employeeID)
 );
-
-DELIMITER $$
-
-CREATE PROCEDURE `check_atminfo`(IN OfficerInCharge VARCHAR(20), branchCode VARCHAR(20), Amount FLOAT(100,4))
-  BEGIN
-    DECLARE officer_branch VARCHAR(20);
-    SET officer_branch = (SELECT branchCode from employee WHERE employeeID = OfficerInCharge);
-    IF Amount < 0
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'ATM cash balance is incorrect!';
-    END IF;
-    IF branchCode != officer_branch
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Wrong officer, branch combination...!';
-    END IF;
-  END$$
-DELIMITER ;
-
--- before update atm information
-DELIMITER $$
-CREATE TRIGGER `check_atm_info_before_update`
-  BEFORE UPDATE
-  ON `ATMInformation`
-  FOR EACH ROW
-  BEGIN
-    CALL check_atminfo(new.OfficerInCharge, new.branchCode, new.Amount);
-  END$$
-DELIMITER ;
-
--- before insert to atm information
-DELIMITER $$
-CREATE TRIGGER `check_atm_info_before_insert`
-  BEFORE INSERT
-  ON `ATMInformation`
-  FOR EACH ROW
-  BEGIN
-    CALL check_atminfo(new.OfficerInCharge, new.branchCode, new.Amount);
-  END$$
-DELIMITER ;
-
-CREATE TABLE ATMCard (
-  cardID     varchar(20) PRIMARY KEY,
-  AccountID  VARCHAR(20) NOT NULL,
-  startDate  DATE        NOT NULL,
-  ExpireDate DATE        NOT NULL,
-  FOREIGN KEY (AccountID) REFERENCES Account (AccountId)
-);
-
--- to validate card dates
-DELIMITER $$
-
-CREATE PROCEDURE `check_card`(IN startDate DATE, IN expiryDate DATE, IN cardNO VARCHAR(20) )
-  BEGIN
-    IF startDate > NOW()
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Start date is incorrect!';
-    END IF;
-    IF expiryDate <= NOW()
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Card is expired!';
-    END IF;
-    IF CHAR_LENGTH(cardNO) != 16
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'length of the card must be equal to 16';
-    END IF;
-  END$$
-DELIMITER ;
-
--- before insert to atm card
-DELIMITER $$
-CREATE TRIGGER `check_card_before_insert`
-  BEFORE INSERT
-  ON `ATMCard`
-  FOR EACH ROW
-  BEGIN
-    CALL check_card(new.startDate, new.ExpireDate, new.cardID);
-  END$$
-DELIMITER ;
-
--- before update atm card
-DELIMITER $$
-CREATE TRIGGER `check_card_before_update`
-  BEFORE UPDATE
-  ON `ATMCard`
-  FOR EACH ROW
-  BEGIN
-    CALL check_card(new.startDate, new.ExpireDate, new.cardID);
-  END$$
-DELIMITER ;
-
-
 
 CREATE TABLE ATMTransaction (
   TransactionID varchar(20) PRIMARY KEY,
@@ -606,7 +406,13 @@ CREATE TABLE Transaction (
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
 );
 
-
+CREATE TABLE ATMCard (
+  cardID     varchar(20) PRIMARY KEY,
+  AccountID  VARCHAR(20) NOT NULL,
+  startDate  DATE        NOT NULL,
+  ExpireDate DATE        NOT NULL,
+  FOREIGN KEY (AccountID) REFERENCES Account (AccountId)
+);
 
 CREATE TABLE UserLogin (
   id        INT AUTO_INCREMENT,
@@ -650,11 +456,11 @@ DELIMITER ;
 
 #Adding a transaction
 DELIMITER $$
-CREATE FUNCTION check_account_balance(old_balance FLOAT(100, 4), transaction_amount FLOAT(100, 4))
+CREATE FUNCTION check_account_balance(old_balance DECIMAL(13, 2), transaction_amount DECIMAL(13, 2))
   RETURNS BOOLEAN
 DETERMINISTIC
   BEGIN
-    DECLARE remained_amount FLOAT(100, 4);
+    DECLARE remained_amount DECIMAL(13, 2);
     SET remained_amount = (old_balance - transaction_amount);
 
     IF remained_amount < 0
@@ -675,7 +481,7 @@ CREATE TRIGGER `parts_before_insert_transaction_normal`
   ON `Transaction`
   FOR EACH ROW
   BEGIN
-    DECLARE old_balance FLOAT(100, 4);
+    DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
     IF check_account_balance(old_balance, NEW.Amount) = true
     THEN
@@ -694,7 +500,7 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
   ON `Transaction`
   FOR EACH ROW
   BEGIN
-    DECLARE old_balance FLOAT(100, 4);
+    DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
     IF check_account_balance(old_balance, NEW.Amount) = true
     THEN
@@ -719,26 +525,11 @@ WHERE EXISTS(SELECT passsword
                AND passsword = MD5('0773842106')
                AND role = 'user');
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Children",12,0);
-
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
- VALUES ("Teen",11,500);
-
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Adult",10,1000);
-
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Senior",13,1000);
-
-INSERT INTO `fdtype`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
-
 INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
 VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
 
 INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
 VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
-
 
 # INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 # VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
@@ -752,42 +543,24 @@ VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
 INSERT INTO `BranchManager` (`branchID`, `employeeID`)
 VALUES ('BRHORANA001', 'EMP001');
 
-BEGIN;
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
-VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
+VALUES ('ACC001', 'ABC01', 'BRHORANA001', '8000.0000', 'NOM1234');
 
-INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
-VALUES ('ACC001',"Adult");
-COMMIT ;
-
-
-BEGIN;
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
-VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
-
-INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
-VALUES ('ACC002',"Teen");
-COMMIT;
-
-UPDATE `account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
-UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
-
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
+VALUES ('ACC002', 'ABC01', 'BRHORANA001', '7000.0000', 'NOM1234');
 
 INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '2000.0000');
+VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
 
-INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('TR002', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '500.0000');
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Children",12,0);
 
-# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-# VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
-#
-#
-# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-# VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+ VALUES ("Teen",11,500);
 
-INSERT INTO `fixeddeposit`(`FDid`, `AccountId`, `typeId`, `amount`) VALUES ("FD0000","ACC001","FDT001",100000);
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Adult",10,1000);
 
-INSERT INTO `atminformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Senior",13,1000);
 
-INSERT INTO `atmcard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
