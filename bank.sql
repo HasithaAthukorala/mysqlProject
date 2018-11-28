@@ -759,12 +759,14 @@ VALUES ("Senior",13,1000);
 INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
 
 
+
 INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
 VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
 
 INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
 VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
 
+INSERT INTO `ATMInformation` (ATMId, OfficerInCharge, location, branchCode, Amount) VALUES ('ATM0001','EMP001','atmlocation1','BRHORANA001',20000);
 # INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 # VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
 
@@ -857,18 +859,21 @@ $$
 DELIMITER ;
 
 DELIMITER $$
-CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN amount DECIMAL(13,2))
+CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN _amount DECIMAL(13,2))
   BEGIN
     DECLARE newBalance DECIMAL(13,2);
     DECLARE atmBalance DECIMAL(13,2);
     DECLARE withdrawals INT(11);
-    SET newBalance = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) - amount;
-    SET atmBalance =(SELECT Amount FROM ATMInformation WHERE atmId=ATMInformation.ATMId) - amount;
-    SET withdrawals = (SELECT 	noOfWithdrawals FROM SavingsAccount WHERE AccountId = fromAccount) + 1;
-    IF atmBalance > 0 THEN
+    SELECT (AccountBalance ) INTO newBalance FROM Account WHERE AccountId = fromAccount LIMIT 1;
+    SELECT (Amount ) INTO atmBalance FROM ATMInformation WHERE ATMId=atmId LIMIT 1;
+    SELECT 	(noOfWithdrawals ) INTO withdrawals FROM SavingsAccount WHERE AccountId = fromAccount LIMIT 1;
+    SET newBalance = newBalance - _amount;
+    SET atmBalance = atmBalance - _amount;
+    SET withdrawals = withdrawals + 1;
+    IF atmBalance >= 0 THEN
       START TRANSACTION ;
         INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
-        VALUES (fromAccount,atmId,amount);
+        VALUES (fromAccount,atmId,_amount);
         UPDATE Account
             SET AccountBalance = newBalance WHERE AccountId = fromAccount;
         UPDATE ATMInformation
@@ -911,7 +916,6 @@ CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
 DELIMITER ;
 
 CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
-
 
 DELIMITER $$
  CREATE PROCEDURE createFixedDeposit(IN FDid VARCHAR(20),
@@ -1084,8 +1088,6 @@ CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
 $$
 DELIMITER ;
 
-
-
 DELIMITER $$
 CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN purpose        TEXT,
@@ -1182,9 +1184,10 @@ CREATE USER IF NOT EXISTS 'guest'@'localhost' IDENTIFIED BY 'guest';
 GRANT SELECT ON bank.userLoginView TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
-GRANT INSERT ON bank.LoanApplicaton TO 'usr'@'localhost';
 GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
 GRANT SELECT ON bank.transactionHistoryView TO 'usr'@'localhost';
+GRANT EXECUTE ON bank.create_loanApplication TO 'usr'@'localhost';
+GRANT EXECUTE ON bank.validate_online_loan TO 'usr'@'localhost';
 
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
