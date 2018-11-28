@@ -47,6 +47,8 @@ CREATE TRIGGER `parts_before_update`
   END$$
 DELIMITER ;
 
+
+
 CREATE TABLE IndividualCustomer (
   CustomerId        VARCHAR(20),
   FirstName         TEXT                          NOT NULL,
@@ -58,6 +60,30 @@ CREATE TABLE IndividualCustomer (
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId)
 );
 
+-- to validate birthdays
+DELIMITER $$
+
+CREATE PROCEDURE `check_birthday`(IN dob DATE)
+  BEGIN
+    IF dob > NOW()
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Date of Birth is incorrect!';
+    end if;
+  END$$
+DELIMITER ;
+
+-- validate birthday of new customer
+DELIMITER $$
+CREATE TRIGGER `check_birthday_before_insert`
+  BEFORE INSERT
+  ON `IndividualCustomer`
+  FOR EACH ROW
+  BEGIN
+    CALL check_birthday(new.DateOfBirth);
+  END$$
+DELIMITER ;
+
 CREATE TABLE Organization (
   CustomerId       VARCHAR(20),
   organizationName TEXT NOT NULL,
@@ -65,7 +91,7 @@ CREATE TABLE Organization (
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId)
 );
 
-#Isuru
+
 
 CREATE TABLE Interest (
   accountType    VARCHAR(20) PRIMARY KEY,
@@ -117,6 +143,29 @@ CREATE TABLE Employee (
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
 );
 
+
+-- before insert to employee
+DELIMITER $$
+CREATE TRIGGER `check_employee_birthday_before_insert`
+  BEFORE INSERT
+  ON `Employee`
+  FOR EACH ROW
+  BEGIN
+    CALL check_birthday(new.dateOfBirth);
+  END$$
+DELIMITER ;
+
+-- before update an employee
+DELIMITER $$
+CREATE TRIGGER `check_employee_before_update`
+  BEFORE UPDATE
+  ON `Employee`
+  FOR EACH ROW
+  BEGIN
+    CALL check_birthday(new.dateOfBirth);
+  END$$
+DELIMITER ;
+
 CREATE TABLE BranchManager (
   branchID   VARCHAR(20) PRIMARY KEY,
   employeeID VARCHAR(20) NOT NULL,
@@ -128,7 +177,7 @@ CREATE TABLE Account (
   AccountId      VARCHAR(20) NOT NULL,
   CustomerId     VARCHAR(20)   NOT NULL,
   branchCode     VARCHAR(20)   NOT NULL,
-  AccountBalance DECIMAL(13, 2) NOT NULL,
+  AccountBalance DECIMAL(13, 2) NOT NULL default 0,
   NomineeId      VARCHAR(20)   NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId),
@@ -139,7 +188,7 @@ CREATE TABLE Account (
 
 CREATE TABLE SavingsAccount (
   AccountId       VARCHAR(20) NOT NULL,
-  noOfWithdrawals INT    NOT NULL,
+  noOfWithdrawals INT    NOT NULL default 0,
   accountType     VARCHAR(20) NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (AccountId) REFERENCES Account (AccountId),
@@ -178,6 +227,57 @@ CREATE TRIGGER `check_account_balance`
   END$$
 DELIMITER ;
 
+DELIMITER $$
+
+-- to validate no of withdrawals and account type
+CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType VARCHAR(20), IN AccountId VARCHAR(20) )
+  BEGIN
+    DECLARE customer DATE;
+    SET customer = (SELECT DateOfBirth from Account  inner join IndividualCustomer on Account.CustomerId = IndividualCustomer.CustomerId where Account.AccountId = AccountId);
+    IF noOfWithdrawals < 0
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Withdrawal count should be greater than zero...!';
+    END IF;
+    IF noOfWithdrawals > 5
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Withdrawal limit has been exceeded...!';
+    END IF;
+    IF !(accountType IN("Children", "Adult", "Teen", "Senior"))
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Account type is incorect...!';
+    END IF;
+
+
+  END$$
+
+DELIMITER ;
+
+-- when updating an savings account
+DELIMITER $$
+CREATE TRIGGER `check_savings_account_when_update`
+  BEFORE UPDATE
+  ON `SavingsAccount`
+  FOR EACH ROW
+  BEGIN
+    CALL check_savings_account(new.noOfWithdrawals, new.accountType);
+  END$$
+DELIMITER ;
+
+-- when inserting to savings account
+DELIMITER $$
+CREATE TRIGGER `check_savings_account_when_insert`
+  BEFORE INSERT
+  ON `SavingsAccount`
+  FOR EACH ROW
+  BEGIN
+    CALL check_savings_account(new.noOfWithdrawals, new.accountType);
+  END$$
+DELIMITER ;
+
+
 
 CREATE TABLE FixedDeposit (
   FDid      VARCHAR(20)   NOT NULL,
@@ -190,6 +290,31 @@ CREATE TABLE FixedDeposit (
   FOREIGN KEY (AccountId) REFERENCES SavingsAccount (AccountId)    ON DELETE CASCADE
 );
 
+DELIMITER $$
+
+
+-- to validate fd amount
+CREATE PROCEDURE `check_fd_amount`(IN amount FLOAT(100,4))
+  BEGIN
+    IF amount < 0
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'FD amount should be greater than zero...!';
+    END IF;
+  END$$
+
+DELIMITER ;
+
+-- when inserting to a fd
+DELIMITER $$
+CREATE TRIGGER `check_fd_when_insert`
+  BEFORE INSERT
+  ON `FixedDeposit`
+  FOR EACH ROW
+  BEGIN
+    CALL check_fd_amount(new.amount);
+  END$$
+DELIMITER ;
 
 
 CREATE TABLE Gurantor (
@@ -433,6 +558,7 @@ CREATE TABLE UserLogin (
   passsword VARCHAR(32),
   role      ENUM ("admin", "user", "employee"),
   PRIMARY KEY (id)
+
 );
 
 DELIMITER $$
