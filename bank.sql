@@ -786,6 +786,9 @@ SELECT accountType FROM Interest;
 CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
+CREATE VIEW transactionHistoryView AS
+SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.fromAccountID) AS fromCustomerId ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.toAccountID) AS toCustomerId FROM Transaction;
+
 DELIMITER $$
 CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN branchCode VARCHAR(20),IN amount DECIMAL(13,2))
   BEGIN
@@ -1095,6 +1098,8 @@ GRANT SELECT ON bank.userLoginView TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
 GRANT INSERT ON bank.LoanApplicaton TO 'usr'@'localhost';
-GRANT INSERT ON bank.loanapplicaton TO 'usr'@'localhost';
 GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
+GRANT SELECT ON bank.transactionHistoryView TO 'usr'@'localhost';
 
+CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
+GRANT ALL ON bank.* TO 'adm'@'localhost';
