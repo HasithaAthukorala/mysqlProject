@@ -44,8 +44,11 @@ CREATE TABLE Customer (
   PhoneNumber  VARCHAR(10),
   EmailAddress TEXT,
   CHECK (CHAR_LENGTH(PhoneNumber) = 10),
+  CHECK (CHAR_LENGTH(PhoneNumber) = 10),
   PRIMARY KEY (CustomerId)
 );
+
+INSERT INTO Customer VALUES ("ABC02", "Matara", "0716492763", "kas@gmail.com");
 
 DELIMITER $$
 CREATE PROCEDURE `check_num`(IN phone VARCHAR(20))
@@ -444,6 +447,10 @@ CREATE TABLE LoanInterest (
   installmentDuration INT   NOT NULL,
   PRIMARY KEY (loanType)
 );
+
+INSERT INTO LoanInterest VALUES ("1",5,12);
+INSERT INTO LoanInterest VALUES ("2",10,24);
+INSERT INTO LoanInterest VALUES ("3",15,36);
 
 CREATE TABLE LoanApplicaton (
   applicationID     INT                  NOT NULL AUTO_INCREMENT,
@@ -895,7 +902,10 @@ CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
 CREATE VIEW transactionHistoryView AS
-SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.fromAccountID) AS fromCustomerId ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.toAccountID) AS toCustomerId FROM Transaction;
+SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.fromAccountID) AS fromCustomerId ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.toAccountID) AS toCustomerId FROM Transaction ORDER BY Transaction.TransactionID DESC ;
+
+CREATE VIEW atmDetails AS
+SELECT ATMId FROM ATMInformation;
 
 DELIMITER $$
 CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN branchCode VARCHAR(20),IN amount DECIMAL(13,2))
@@ -1251,6 +1261,7 @@ GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
 GRANT SELECT ON bank.transactionHistoryView TO 'usr'@'localhost';
 GRANT EXECUTE ON bank.create_loanApplication TO 'usr'@'localhost';
 GRANT EXECUTE ON bank.validate_online_loan TO 'usr'@'localhost';
+GRANT SELECT ON bank.atmDetails TO 'usr'@'localhost';
 
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
