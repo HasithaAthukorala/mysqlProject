@@ -523,7 +523,7 @@ CREATE TABLE ATMInformation (
 );
 
 CREATE TABLE ATMTransaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   ATMId         VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
@@ -736,6 +736,30 @@ CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount
       UPDATE account
           SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
     COMMIT;
+  END
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance DECIMAL(13,2);
+    DECLARE atmBalance DECIMAL(13,2);
+    SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
+    IF atmBalance > 0 THEN
+      START TRANSACTION ;
+        INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
+        VALUES (fromAccount,atmId,amount);
+        UPDATE account
+            SET AccountBalance = newBalance WHERE AccountId = fromAccount;
+        UPDATE ATMInformation
+            SET Amount = atmBalance WHERE ATMId= atmId;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'ATM HAS INSUFFICIENT FUNDS';
+    END IF ;
   END
 $$
 DELIMITER ;
