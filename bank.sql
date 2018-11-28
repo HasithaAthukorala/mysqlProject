@@ -523,7 +523,7 @@ CREATE TABLE ATMInformation (
 );
 
 CREATE TABLE ATMTransaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   ATMId         VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
@@ -533,7 +533,7 @@ CREATE TABLE ATMTransaction (
 );
 
 CREATE TABLE Transaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   toAccountID   VARCHAR(20) NOT NULL,
   branchCode    VARCHAR(20) NOT NULL,
@@ -686,8 +686,8 @@ VALUES ('ACC001', 'ABC01', 'BRHORANA001', '8000.0000', 'NOM1234');
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
 VALUES ('ACC002', 'ABC01', 'BRHORANA001', '7000.0000', 'NOM1234');
 
-INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
+INSERT INTO `Transaction` (`fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+VALUES ('ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
 
 INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Children",12,0);
@@ -720,6 +720,56 @@ SELECT accountType FROM Interest;
 CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
+DELIMITER $$
+CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN branchCode VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance_from DECIMAL(13,2);
+    DECLARE newBalance_to DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
+    START TRANSACTION ;
+      INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
+      VALUES (fromAccount,toAccount,branchCode,amount);
+      UPDATE account
+          SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
+      UPDATE account
+          SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
+      UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+    COMMIT;
+  END
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance DECIMAL(13,2);
+    DECLARE atmBalance DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    IF atmBalance > 0 THEN
+      START TRANSACTION ;
+        INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
+        VALUES (fromAccount,atmId,amount);
+        UPDATE account
+            SET AccountBalance = newBalance WHERE AccountId = fromAccount;
+        UPDATE ATMInformation
+            SET Amount = atmBalance WHERE ATMId= atmId;
+        UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'ATM HAS INSUFFICIENT FUNDS';
+    END IF ;
+  END
+$$
+DELIMITER ;
 
 DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
