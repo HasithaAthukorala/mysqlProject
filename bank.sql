@@ -575,3 +575,38 @@ SELECT AccountID,customerID,branchCode,AccountBalance,NomineeId FROM Account;
 CREATE VIEW userLoginView AS
 SELECT username,passsword,role FROM UserLogin;
 
+CREATE VIEW accountTypeDetails AS
+SELECT accountType FROM Interest;
+
+DROP PROCEDURE createSavingAccount ;
+DELIMITER $$
+CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
+                                    IN CustomerId VARCHAR(20),
+                                    IN branchCode VARCHAR(20),
+                                    IN accountBalance DECIMAL(13,2),
+                                    IN NomineeId VARCHAR(20),
+                                    IN accountType VARCHAR(20))
+  BEGIN
+    # CHECK MINIMUM BALANCE
+    DECLARE minimumBlance DECIMAL(13,2);
+    SELECT MinimumBalance INTO minimumBlance FROM Interest WHERE Interest.accountType = accountType;
+    IF minimumBlance >= accountBalance THEN
+      START TRANSACTION ;
+        INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
+        VALUES (accountId,CustomerId,branchCode,accountBalance,NomineeId);
+        INSERT INTO `SavingsAccount` (`AccountId`,`noOfWithdrawals`,`accountType`)
+        VALUES (accountId,0,accountType);
+      COMMIT ;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'ACCOUNT BALANCE IS LESS THAN MINIMUM BALANCE OR ACCOUNT TYPE IS INVALID';
+    END IF ;
+  END
+ $$
+DELIMITER ;
+
+CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
+
+# Time based events
+SELECT * FROM Account;
+SELECT * FROM SavingsAccount;
