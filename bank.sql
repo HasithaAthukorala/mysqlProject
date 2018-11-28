@@ -196,6 +196,12 @@ CREATE TABLE SavingsAccount (
   FOREIGN KEY (accountType) REFERENCES Interest (accountType)
 );
 
+CREATE TABLE LateLoans(
+  loanId INT(11) primary key ,
+  customerId VARCHAR(20) NOT NULL,
+  FOREIGN KEY (customerId) REFERENCES Customer(CustomerId)
+);
+
 DELIMITER $$
 
 CREATE PROCEDURE `check_balance`(IN AccBalance DECIMAL(13,2), IN AccId VARCHAR(20))
@@ -395,8 +401,6 @@ CREATE TABLE LoanApplicaton (
   FOREIGN KEY (customerID) REFERENCES Customer (CustomerId),
   FOREIGN KEY (loanType) REFERENCES LoanInterest (loanType)
 );
-
-
 
 # Validation for LoanInterest table
 DELIMITER $$
@@ -954,9 +958,31 @@ END
 $$
 DELIMITER ;
 
+DELIMITER $$
+CREATE EVENT lateLoanLoggerFlusher
+  ON SCHEDULE EVERY '1' MONTH
+  STARTS '2018-12-01 00:00:00'
+  DO
+    BEGIN
+      START TRANSACTION ;
+        DELETE FROM LateLoans;
+      COMMIT ;
+END
+$$
+DELIMITER ;
 
-
-SELECT * FROM FixedDeposit LEFT JOIN FDType T on FixedDeposit.typeId = T.typeId;
+DELIMITER $$
+CREATE EVENT lateLoanLogger
+  ON SCHEDULE EVERY '1' DAY
+  DO
+    BEGIN
+      START TRANSACTION ;
+      INSERT INTO LateLoans
+      SELECT loanID,customerId FROM Loan WHERE CURDATE()> nextInstallmentDate;
+      COMMIT;
+END
+$$
+DELIMITER ;
 
 DELIMITER $$
 CREATE EVENT fixedDepositInterestEvent
@@ -1048,15 +1074,19 @@ DELIMITER $$
 CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
   BEGIN
     START TRANSACTION ;
+
       UPDATE pendingLoanStatus
           SET applicationStatus = 1 WHERE applicationID = _applicationID;
       INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
-      SELECT customerID,loanType,loanAmount,startDate,endDate,nextInstallmentDate,nextInstallment,numberOfInstallments,applicationID FROM loanapplicaton;
+      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/DATEDIFF(startDate,endDate)/30,DATEDIFF(startDate,endDate)/30,applicationID FROM loanapplicaton;
     COMMIT ;
   END
 $$
 DELIMITER ;
 
+
+
+DELIMITER $$
 CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN purpose        TEXT,
                                         IN sourceOfFunds  TEXT,
@@ -1134,11 +1164,9 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'No such Customer exists';
     END IF;
-  end $$
-
+  end
+$$
 DELIMITER ;
-
-
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
 GRANT SELECT ON bank.* TO 'emp'@'localhost';
