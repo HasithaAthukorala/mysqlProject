@@ -533,7 +533,7 @@ CREATE TABLE ATMTransaction (
 );
 
 CREATE TABLE Transaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   toAccountID   VARCHAR(20) NOT NULL,
   branchCode    VARCHAR(20) NOT NULL,
@@ -687,8 +687,8 @@ VALUES ('ACC001', 'ABC01', 'BRHORANA001', '8000.0000', 'NOM1234');
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
 VALUES ('ACC002', 'ABC01', 'BRHORANA001', '7000.0000', 'NOM1234');
 
-INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
+INSERT INTO `Transaction` (`fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+VALUES ('ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
 
 INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Children",12,0);
@@ -721,6 +721,15 @@ SELECT accountType FROM Interest;
 CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
+DELIMITER $$
+CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    START TRANSACTION ;
+
+    COMMIT;
+  END
+$$
+DELIMITER ;
 
 DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
