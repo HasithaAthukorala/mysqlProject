@@ -99,6 +99,7 @@ CREATE TABLE Interest (
   MinimumBalance DECIMAL(13, 2) NOT NULL
 );
 
+
 CREATE TABLE Nominee (
   NomineeId VARCHAR(20) PRIMARY KEY,
   Name      VARCHAR(20) NOT NULL,
@@ -347,13 +348,27 @@ DELIMITER ;
 
 
 CREATE TABLE Gurantor (
-  nicNumber VARCHAR(10) NOT NULL,
-  name      varchar(20) NOT NULL,
-  address   TEXT        NOT NULL,
-  phone     VARCHAR(10) NOT NULL,
+  gurantoID VARCHAR(20) NOT NULL,
   NoOfLoans INT(2),
-  PRIMARY KEY (nicNumber)
+  PRIMARY KEY (gurantoID),
+  FOREIGN KEY (gurantoID) REFERENCES Customer (CustomerId)
 );
+
+DELIMITER $$
+CREATE TRIGGER `parts_before_update_Gurantor`
+  BEFORE UPDATE
+  ON `Gurantor`
+  FOR EACH ROW
+  BEGIN
+    DECLARE count INT(2);
+    SELECT NoOfLoans INTO count FROM `Gurantor` WHERE gurantoID = NEW.gurantoID;
+    SET count = count + 1;
+    IF count>3 THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Guranor has already guranterd for 3 loans';
+    end if ;
+  END$$
+DELIMITER ;
 
 CREATE TABLE LoanInterest (
   loanType            ENUM ("1", "2", "3"),
@@ -363,15 +378,22 @@ CREATE TABLE LoanInterest (
 );
 
 CREATE TABLE LoanApplicaton (
-  applicationID     INT     NOT NULL AUTO_INCREMENT,
-  gurrantorID       VARCHAR(10),
-  purpose           TEXT    NOT NULL,
-  sourceOfFunds     TEXT    NOT NULL,
-  collateralType    TEXT    NOT NULL,
-  collateraNotes    TEXT    NOT NULL,
-  applicationStatus BOOLEAN NOT NULL,
+  applicationID     INT                  NOT NULL AUTO_INCREMENT,
+  gurrantorID       VARCHAR(20),
+  purpose           TEXT                 NOT NULL,
+  sourceOfFunds     TEXT                 NOT NULL,
+  collateralType    TEXT                 NOT NULL,
+  collateraNotes    TEXT                 NOT NULL,
+  applicationStatus BOOLEAN              NOT NULL,
+  customerID        VARCHAR(20)          NOT NULL,
+  loanType          ENUM ("1", "2", "3") NOT NULL,
+  loanAmount        DECIMAL(13, 2)       NOT NULL,
+  startDate         DATE                 NOT NULL,
+  endDate           DATE                 NOT NULL,
   PRIMARY KEY (applicationID),
-  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (nicNumber)
+  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (gurantoID),
+  FOREIGN KEY (customerID) REFERENCES Customer (CustomerId),
+  FOREIGN KEY (loanType) REFERENCES LoanInterest (loanType)
 );
 
 
@@ -677,19 +699,19 @@ WHERE EXISTS(SELECT passsword
                AND passsword = MD5('0773842106')
                AND role = 'user');
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Children",12,0);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
  VALUES ("Teen",11,500);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Adult",10,1000);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
 
-INSERT INTO `fdtype`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
+INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
 
 
 INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
@@ -705,7 +727,7 @@ VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, 
 INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
 
-INSERT INTO `individualcustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
+INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
 
 
 INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
@@ -718,19 +740,19 @@ VALUES ('BRHORANA001', 'EMP001');
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
 VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
 
-INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
+INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
 VALUES ('ACC001',"Adult");
 
 BEGIN;
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
 VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
 
-INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
+INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
 VALUES ('ACC002',"Teen");
 COMMIT;
 
-UPDATE `account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
-UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
+UPDATE `Account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
+UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 
 
 
@@ -741,9 +763,9 @@ UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 # INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
 # VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
 
-INSERT INTO `atminformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
+INSERT INTO `ATMInformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
 
-INSERT INTO `atmcard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
+INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
 CREATE VIEW branchDetailView AS
 SELECT branchCode,branchName FROM Branch;
 
@@ -770,15 +792,15 @@ CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount
     DECLARE newBalance_from DECIMAL(13,2);
     DECLARE newBalance_to DECIMAL(13,2);
     DECLARE withdrawals INT(11);
-    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
-    SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
-    SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM SavingsAccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance_from = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) - amount;
+    SET newBalance_to = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) + amount;
     START TRANSACTION ;
       INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
       VALUES (fromAccount,toAccount,branchCode,amount);
-      UPDATE account
+      UPDATE Account
           SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
-      UPDATE account
+      UPDATE Account
           SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
       UPDATE SavingsAccount
             SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
@@ -793,14 +815,14 @@ CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN
     DECLARE newBalance DECIMAL(13,2);
     DECLARE atmBalance DECIMAL(13,2);
     DECLARE withdrawals INT(11);
-    SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
-    SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
-    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) - amount;
+    SET atmBalance =(SELECT Amount FROM ATMInformation WHERE atmId=ATMInformation.ATMId) - amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM SavingsAccount WHERE AccountId = fromAccount) + 1;
     IF atmBalance > 0 THEN
       START TRANSACTION ;
         INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
         VALUES (fromAccount,atmId,amount);
-        UPDATE account
+        UPDATE Account
             SET AccountBalance = newBalance WHERE AccountId = fromAccount;
         UPDATE ATMInformation
             SET Amount = atmBalance WHERE ATMId= atmId;
@@ -877,7 +899,7 @@ CREATE EVENT savingAccountInterestCalculationEvent
   DO
     BEGIN
       START TRANSACTION ;
-      UPDATE account
+      UPDATE Account
         SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM SavingsAccount left join Interest on SavingsAccount.accountType = Interest.accountType where Account.AccountId = SavingsAccount.AccountId)
         WHERE AccountId IN (
             SELECT AccountId FROM SavingsAccount
@@ -899,7 +921,7 @@ CREATE EVENT fixedDepositInterestEvent
   DO
     BEGIN
       START TRANSACTION ;
-      UPDATE account
+      UPDATE Account
         SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM FixedDeposit LEFT JOIN FDType T on FixedDeposit.typeId = T.typeId where Account.AccountId = FixedDeposit.AccountId)
         WHERE AccountId IN (
             SELECT AccountId FROM FixedDeposit WHERE nextInterestDate = CURDATE()
@@ -912,41 +934,167 @@ END
 $$
 DELIMITER ;
 
+
 # Loan application
 DELIMITER $$
 
 CREATE FUNCTION check_acount
-   (id Varchar(20), nic Varchar(12)) RETURNS boolean
-BEGIN
-DECLARE result boolean;
-DECLARE newID VARCHAR(20);
+  (id Varchar(20))
+  RETURNS boolean
+  BEGIN
+    DECLARE result boolean;
+    DECLARE newID INT;
 
-SELECT COUNT(CustomerId) into newID from IndividualCustomer WHERE CustomerId=id AND NIC=nic;
+    SELECT COUNT(CustomerId) into newID from Customer WHERE CustomerId = id;
 
-IF newID>0 then
-  SET result = TRUE ;
-ELSE
-  SET result = FALSE ;
-end if;
+    IF newID > 0
+    then
+      SET result = TRUE;
+    ELSE
+      SET result = FALSE;
+    end if;
 
-RETURN result;
 
-END $$
+    RETURN result;
+
+  END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
+GRANT ALL ON bank.* TO 'adm'@'localhost';
+
+CREATE PROCEDURE update_loanCount(id VARCHAR(20))
+  BEGIN
+    DECLARE count INT(2);
+    SELECT NoOfLoans INTO count FROM Gurantor WHERE gurantoID = id;
+    SET count = count + 1;
+    UPDATE Gurantor SET NoOfLoans = count WHERE gurantoID = id;
+  END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE FUNCTION check_gurantor
+  (id Varchar(20))
+  RETURNS boolean
+  BEGIN
+    DECLARE result boolean;
+    DECLARE newID INT;
+
+    SELECT COUNT(gurantoID) into newID from Gurantor WHERE gurantoID = id;
+
+    IF newID > 0
+    then
+      SET result = TRUE;
+    ELSE
+      SET result = FALSE;
+    end if;
+
+
+    RETURN result;
+
+  END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
+                                        IN purpose        TEXT,
+                                        IN sourceOfFunds  TEXT,
+                                        IN collateralType TEXT,
+                                        IN collateraNotes TEXT,
+                                        IN customerID     VARCHAR(20),
+                                        IN loanType       ENUM ("1", "2", "3"),
+                                        IN loanAmount     DECIMAL(13, 2),
+                                        IN startDate      DATE,
+                                        IN endDate        DATE)
+  BEGIN
+    IF check_acount(customerID)
+    THEN
+      IF check_acount(gurrantorID)
+      THEN
+        IF check_gurantor(gurrantorID)
+        THEN
+          START TRANSACTION ;
+          CALL update_loanCount(gurrantorID);
+          INSERT INTO `LoanApplicaton` (`gurrantorID`,
+                                        `purpose`,
+                                        `sourceOfFunds`,
+                                        `collateralType`,
+                                        `collateraNotes`,
+                                        `applicationStatus`,
+                                        `customerID`,
+                                        `loanType`,
+                                        `loanAmount`,
+                                        `startDate`,
+                                        `endDate`)
+          VALUES (gurrantorID,
+                  purpose,
+                  sourceOfFunds,
+                  collateralType,
+                  collateraNotes,
+                  FALSE,
+                  customerID,
+                  loanType,
+                  loanAmount,
+                  startDate,
+                  endDate);
+          COMMIT ;
+        ELSE
+          START TRANSACTION ;
+          INSERT INTO Gurantor VALUES (gurrantorID, 1);
+          INSERT INTO `LoanApplicaton` (`gurrantorID`,
+                                        `purpose`,
+                                        `sourceOfFunds`,
+                                        `collateralType`,
+                                        `collateraNotes`,
+                                        `applicationStatus`,
+                                        `customerID`,
+                                        `loanType`,
+                                        `loanAmount`,
+                                        `startDate`,
+                                        `endDate`)
+          VALUES (gurrantorID,
+                  purpose,
+                  sourceOfFunds,
+                  collateralType,
+                  collateraNotes,
+                  FALSE,
+                  customerID,
+                  loanType,
+                  loanAmount,
+                  startDate,
+                  endDate);
+          COMMIT ;
+        end if;
+      ELSE
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No such Gurantor exists';
+      end if;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'No such Customer exists';
+    END IF;
+  end $$
 
 DELIMITER ;
 
 
-CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
-GRANT ALL ON bank.* TO 'adm'@'localhost';
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
 GRANT SELECT ON bank.* TO 'emp'@'localhost';
 GRANT EXECUTE ON bank.* TO 'emp'@'localhost';
 
 CREATE USER IF NOT EXISTS 'guest'@'localhost' IDENTIFIED BY 'guest';
-GRANT SELECT ON bank.userloginview TO 'guest'@'localhost';
+GRANT SELECT ON bank.userLoginView TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
+GRANT INSERT ON bank.LoanApplicaton TO 'usr'@'localhost';
 GRANT INSERT ON bank.loanapplicaton TO 'usr'@'localhost';
 GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
 
