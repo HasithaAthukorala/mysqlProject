@@ -564,3 +564,14 @@ VALUES ("Adult",10,1000);
 INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
 
+CREATE VIEW branchDetailView AS
+SELECT branchCode,branchName FROM Branch;
+
+#SELECT * FROM branchDetailView;
+
+CREATE VIEW accountDetailsView AS
+SELECT AccountID,customerID,branchCode,AccountBalance,NomineeId FROM Account;
+
+CREATE VIEW userLoginView AS
+SELECT username,passsword,role FROM UserLogin;
+
