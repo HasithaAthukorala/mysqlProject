@@ -677,3 +677,27 @@ CREATE EVENT fixedDepositInterestEvent
 END
 $$
 DELIMITER ;
+
+# Loan application
+DELIMITER $$
+
+CREATE FUNCTION check_acount
+   (id Varchar(20), nic Varchar(12)) RETURNS boolean
+BEGIN
+DECLARE result boolean;
+DECLARE newID VARCHAR(20);
+
+SELECT COUNT(CustomerId) into newID from IndividualCustomer WHERE CustomerId=id AND NIC=nic;
+
+IF newID>0 then
+  SET result = TRUE ;
+ELSE
+  SET result = FALSE ;
+end if;
+
+
+RETURN result;
+
+END $$
+
+DELIMITER ;
