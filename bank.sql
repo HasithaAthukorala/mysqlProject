@@ -197,10 +197,10 @@ CREATE TABLE SavingsAccount (
 
 DELIMITER $$
 
-CREATE PROCEDURE `check_balance`(IN AccBalance FLOAT, IN AccId VARCHAR(20))
+CREATE PROCEDURE `check_balance`(IN AccBalance DECIMAL(13,2), IN AccId VARCHAR(20))
   BEGIN
     DECLARE account_type VARCHAR(20);
-    DECLARE minbal FLOAT(100,4);
+    DECLARE minbal DECIMAL(13,2);
     SET account_type = (SELECT accountType from SavingsAccount  where AccountId = AccId);
     SET minbal = (SELECT MinimumBalance from Interest where accountType = account_type);
     IF AccBalance  < 0
@@ -262,7 +262,7 @@ CREATE TRIGGER `check_savings_account_when_update`
   ON `SavingsAccount`
   FOR EACH ROW
   BEGIN
-    CALL check_savings_account(new.noOfWithdrawals, new.accountType);
+    CALL check_savings_account(new.noOfWithdrawals, new.accountType, new.AccountId);
   END$$
 DELIMITER ;
 
@@ -273,7 +273,7 @@ CREATE TRIGGER `check_savings_account_when_insert`
   ON `SavingsAccount`
   FOR EACH ROW
   BEGIN
-    CALL check_savings_account(new.noOfWithdrawals, new.accountType);
+    CALL check_savings_account(new.noOfWithdrawals, new.accountType, new.AccountId);
   END$$
 DELIMITER ;
 
@@ -294,7 +294,7 @@ DELIMITER $$
 
 
 -- to validate fd amount
-CREATE PROCEDURE `check_fd_amount`(IN amount FLOAT(100,4))
+CREATE PROCEDURE `check_fd_amount`(IN amount DECIMAL(13,2))
   BEGIN
     IF amount < 0
     THEN
@@ -328,7 +328,7 @@ CREATE TABLE Gurantor (
 
 CREATE TABLE LoanInterest (
   loanType            ENUM ("1", "2", "3"),
-  interest            FLOAT NOT NULL,
+  interest            DECIMAL(13,2) NOT NULL,
   installmentDuration INT   NOT NULL,
   PRIMARY KEY (loanType)
 );
@@ -360,7 +360,7 @@ CREATE TABLE LoanApplicaton (
 # Validation for LoanInterest table
 DELIMITER $$
 
-CREATE PROCEDURE `check_LoanInterest`(IN interest FLOAT, IN installmentDuration INT)
+CREATE PROCEDURE `check_LoanInterest`(IN interest DECIMAL(13,2), IN installmentDuration INT)
   BEGIN
     IF interest < 0
     THEN
@@ -517,7 +517,7 @@ CREATE TABLE ATMInformation (
   OfficerInCharge VARCHAR(20) NOT NULL,
   location        VARCHAR(20) NOT NULL,
   branchCode      VARCHAR(20) NOT NULL,
-  Amount          FLOAT,
+  Amount          DECIMAL(13,2),
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode),
   FOREIGN KEY (OfficerInCharge) REFERENCES Employee (employeeID)
 );
@@ -527,7 +527,7 @@ CREATE TABLE ATMTransaction (
   fromAccountID VARCHAR(20) NOT NULL,
   ATMId         VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
-  Amount        FLOAT,
+  Amount        DECIMAL(13,2),
   FOREIGN KEY (fromAccountID) REFERENCES Account (AccountId),
   FOREIGN KEY (ATMId) REFERENCES ATMInformation (ATMId)
 );
@@ -538,7 +538,7 @@ CREATE TABLE Transaction (
   toAccountID   VARCHAR(20) NOT NULL,
   branchCode    VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
-  Amount        FLOAT,
+  Amount        DECIMAL(13,2),
   FOREIGN KEY (fromAccountID) REFERENCES Account (AccountId),
   FOREIGN KEY (toAccountID) REFERENCES Account (AccountId),
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
@@ -855,14 +855,4 @@ END $$
 
 DELIMITER ;
 
-# roles and privileges
-CREATE ROLE 'guest','admin','employee';
-
-GRANT SELECT ON bank.userloginview TO 'guest';
-
-GRANT ALL ON bank.* TO 'admin';
-
-GRANT SELECT ON bank.* TO 'employee';
-GRANT ALL ON bank.accountdetailsview TO 'employee';
-GRANT ALL ON bank.pendingLoanStatus TO 'employee';
 
