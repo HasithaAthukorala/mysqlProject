@@ -726,6 +726,8 @@ CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount
   BEGIN
     DECLARE newBalance_from DECIMAL(13,2);
     DECLARE newBalance_to DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
     SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
     SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
     START TRANSACTION ;
@@ -735,6 +737,8 @@ CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount
           SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
       UPDATE account
           SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
+      UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
     COMMIT;
   END
 $$
@@ -745,8 +749,10 @@ CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN
   BEGIN
     DECLARE newBalance DECIMAL(13,2);
     DECLARE atmBalance DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
     SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
     SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
     IF atmBalance > 0 THEN
       START TRANSACTION ;
         INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
@@ -755,6 +761,8 @@ CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN
             SET AccountBalance = newBalance WHERE AccountId = fromAccount;
         UPDATE ATMInformation
             SET Amount = atmBalance WHERE ATMId= atmId;
+        UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
       COMMIT;
     ELSE
       SIGNAL SQLSTATE '45000'
