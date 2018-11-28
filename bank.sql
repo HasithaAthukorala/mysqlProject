@@ -463,6 +463,47 @@ CREATE TABLE OnlineLoan (
   FOREIGN KEY (FDid) REFERENCES FixedDeposit (FDid)
 );
 
+-- validate online loan
+DELIMITER $$
+CREATE PROCEDURE `validate_online_loan`(IN customerID VARCHAR(20),
+                                        IN purpose TEXT,
+                                        IN sourceOfFunds TEXT,
+                                        IN collateralType TEXT,
+                                        IN collateralNotes TEXT,
+                                        IN loanType ENUM("1", "2", "3"),
+                                        IN fd VARCHAR(20),
+                                        IN loanAmount DECIMAL(13,2),
+                                        IN startDate DATE,
+                                        IN endDate DATE,
+                                        IN applicationID VARCHAR(20))
+
+
+  BEGIN
+    DECLARE FDAmount DECIMAL(13,2);
+    DECLARE loanID INT;
+    CALL create_loanApplication(customerID, purpose, sourceOfFunds, collateralType, collateraNotes, customerID, loanType, loanAmount, startDate, endDate);
+    SET FDAmount = (SELECT amount FROM fixeddeposit WHERE AccountiD = fd);
+    IF  amount > FDAmount*0.6 OR amount > 500000
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Requesting loan amount is unacceptable';
+    ELSE
+      START TRANSACTION ;
+        CALL approveLoanApplication(applicationID);
+        SET loanID = (SELECT loanID FROM loan WHERE loan.applicationID = applicationID);
+        INSERT INTO `onlineloan`(`loanID`, `FDid`) VALUES (loanID,fd);
+      COMMIT ;
+
+      CALL approveLoanApplication(applicationID);
+
+
+    END IF;
+
+  END$$
+
+DELIMITER ;
+
+
 # validation for Loan table
 DELIMITER $$
 
@@ -763,7 +804,6 @@ UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 # INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
 # VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
 
-INSERT INTO `ATMInformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
 
 INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
 CREATE VIEW branchDetailView AS
@@ -1005,6 +1045,17 @@ CREATE FUNCTION check_gurantor
 DELIMITER ;
 
 DELIMITER $$
+CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
+  BEGIN
+    START TRANSACTION ;
+      UPDATE pendingLoanStatus
+          SET applicationStatus = 1 WHERE applicationID = _applicationID;
+      INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
+      SELECT customerID,loanType,loanAmount,startDate,endDate,nextInstallmentDate,nextInstallment,numberOfInstallments,applicationID FROM loanapplicaton;
+    COMMIT ;
+  END
+$$
+DELIMITER ;
 
 CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN purpose        TEXT,
