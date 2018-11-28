@@ -1093,17 +1093,21 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN collateralType TEXT,
                                         IN collateraNotes TEXT,
                                         IN customerID     VARCHAR(20),
-                                        IN loanType       ENUM ("1", "2", "3"),
+                                        IN loantype       ENUM ("1", "2", "3"),
                                         IN loanAmount     DECIMAL(13, 2),
                                         IN startDate      DATE,
                                         IN endDate        DATE)
   BEGIN
+    DECLARE precentage 	decimal(13,2);
+    DECLARE amount DECIMAL(13,2);
     IF check_acount(customerID)
     THEN
       IF check_acount(gurrantorID)
       THEN
         IF check_gurantor(gurrantorID)
         THEN
+          SELECT interest INTO precentage FROM LoanInterest WHERE loanType=loantype;
+          SET amount = amount*((precentage+100)/100);
           START TRANSACTION ;
           CALL update_loanCount(gurrantorID);
           INSERT INTO `LoanApplicaton` (`gurrantorID`,
@@ -1124,12 +1128,14 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                   collateraNotes,
                   FALSE,
                   customerID,
-                  loanType,
-                  loanAmount,
+                  loantype,
+                  amount,
                   startDate,
                   endDate);
           COMMIT ;
         ELSE
+          SELECT interest INTO precentage FROM LoanInterest WHERE loanType=loantype;
+          SET amount = amount*((precentage+100)/100);
           START TRANSACTION ;
           INSERT INTO Gurantor VALUES (gurrantorID, 1);
           INSERT INTO `LoanApplicaton` (`gurrantorID`,
@@ -1150,8 +1156,8 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                   collateraNotes,
                   FALSE,
                   customerID,
-                  loanType,
-                  loanAmount,
+                  loantype,
+                  amount,
                   startDate,
                   endDate);
           COMMIT ;
