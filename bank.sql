@@ -197,11 +197,10 @@ CREATE TABLE SavingsAccount (
 
 DELIMITER $$
 
--- to validate account balance
-CREATE PROCEDURE `check_balance`(IN AccBalance FLOAT, IN AccId VARCHAR(20))
+CREATE PROCEDURE `check_balance`(IN AccBalance DECIMAL(13,2), IN AccId VARCHAR(20))
   BEGIN
     DECLARE account_type VARCHAR(20);
-    DECLARE minbal FLOAT(100,4);
+    DECLARE minbal DECIMAL(13,2);
     SET account_type = (SELECT accountType from SavingsAccount  where AccountId = AccId);
     SET minbal = (SELECT MinimumBalance from Interest where accountType = account_type);
     IF AccBalance  < 0
@@ -324,7 +323,7 @@ DELIMITER $$
 
 
 -- to validate fd amount
-CREATE PROCEDURE `check_fd_amount`(IN amount FLOAT(100,4))
+CREATE PROCEDURE `check_fd_amount`(IN amount DECIMAL(13,2))
   BEGIN
     IF amount < 0
     THEN
@@ -356,6 +355,13 @@ CREATE TABLE Gurantor (
   PRIMARY KEY (nicNumber)
 );
 
+CREATE TABLE LoanInterest (
+  loanType            ENUM ("1", "2", "3"),
+  interest            DECIMAL(13,2) NOT NULL,
+  installmentDuration INT   NOT NULL,
+  PRIMARY KEY (loanType)
+);
+
 CREATE TABLE LoanApplicaton (
   applicationID     INT     NOT NULL AUTO_INCREMENT,
   gurrantorID       VARCHAR(10),
@@ -378,7 +384,7 @@ CREATE TABLE LoanInterest (
 # Validation for LoanInterest table
 DELIMITER $$
 
-CREATE PROCEDURE `check_LoanInterest`(IN interest FLOAT, IN installmentDuration INT)
+CREATE PROCEDURE `check_LoanInterest`(IN interest DECIMAL(13,2), IN installmentDuration INT)
   BEGIN
     IF interest < 0
     THEN
@@ -535,28 +541,28 @@ CREATE TABLE ATMInformation (
   OfficerInCharge VARCHAR(20) NOT NULL,
   location        VARCHAR(20) NOT NULL,
   branchCode      VARCHAR(20) NOT NULL,
-  Amount          FLOAT,
+  Amount          DECIMAL(13,2),
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode),
   FOREIGN KEY (OfficerInCharge) REFERENCES Employee (employeeID)
 );
 
 CREATE TABLE ATMTransaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   ATMId         VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
-  Amount        FLOAT,
+  Amount        DECIMAL(13,2),
   FOREIGN KEY (fromAccountID) REFERENCES Account (AccountId),
   FOREIGN KEY (ATMId) REFERENCES ATMInformation (ATMId)
 );
 
 CREATE TABLE Transaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   toAccountID   VARCHAR(20) NOT NULL,
   branchCode    VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
-  Amount        FLOAT,
+  Amount        DECIMAL(13,2),
   FOREIGN KEY (fromAccountID) REFERENCES Account (AccountId),
   FOREIGN KEY (toAccountID) REFERENCES Account (AccountId),
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
@@ -573,9 +579,11 @@ CREATE TABLE ATMCard (
 CREATE TABLE UserLogin (
   id        INT AUTO_INCREMENT,
   username  VARCHAR(255),
+  CustomerId   VARCHAR(20),
   passsword VARCHAR(32),
   role      ENUM ("admin", "user", "employee"),
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  FOREIGN KEY (CustomerId) REFERENCES Customer(CustomerId)
 
 );
 
@@ -640,11 +648,8 @@ CREATE TRIGGER `parts_before_insert_transaction_normal`
   BEGIN
     DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
-    IF check_account_balance(old_balance, NEW.Amount) = true
+    IF check_account_balance(old_balance, NEW.Amount) = false
     THEN
-      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
-      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
-    ELSE
       SIGNAL SQLSTATE '45002'
       SET MESSAGE_TEXT = 'Account balance not enough to transfer';
     END IF;
@@ -659,11 +664,8 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
   BEGIN
     DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
-    IF check_account_balance(old_balance, NEW.Amount) = true
+    IF check_account_balance(old_balance, NEW.Amount) = false
     THEN
-      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
-      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
-    ELSE
       SIGNAL SQLSTATE '45002'
       SET MESSAGE_TEXT = 'Account balance is not enough to transfer';
     END IF;
@@ -671,8 +673,11 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
 DELIMITER ;
 
 #Insert Data
-INSERT INTO `UserLogin` (`id`, `username`, `passsword`, `role`)
-VALUES ('1', 'TESTOR01', MD5('0773842106'), 'user');
+INSERT INTO `UserLogin` (`id`, `username`, `CustomerId`, `passsword`, `role`)
+VALUES ('1', 'TESTOR01','ABC01', MD5('0773842106'), 'user');
+
+INSERT INTO `UserLogin` (`id`, `username`, `CustomerId`, `passsword`, `role`)
+VALUES (NULL , 'tester','ABC01', MD5('12345'), 'user');
 
 SELECT COUNT(*) AS 'result'
 FROM UserLogin
@@ -725,6 +730,8 @@ VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
 
 INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
 VALUES ('ACC001',"Adult");
+INSERT INTO `Transaction` (`fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+VALUES ('ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
 
 
 
@@ -765,6 +772,60 @@ SELECT username,passsword,role FROM UserLogin;
 
 CREATE VIEW accountTypeDetails AS
 SELECT accountType FROM Interest;
+
+CREATE VIEW pendingLoanStatus AS
+SELECT applicationID, applicationStatus FROM LoanApplicaton;
+
+DELIMITER $$
+CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN branchCode VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance_from DECIMAL(13,2);
+    DECLARE newBalance_to DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
+    START TRANSACTION ;
+      INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
+      VALUES (fromAccount,toAccount,branchCode,amount);
+      UPDATE account
+          SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
+      UPDATE account
+          SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
+      UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+    COMMIT;
+  END
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance DECIMAL(13,2);
+    DECLARE atmBalance DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    IF atmBalance > 0 THEN
+      START TRANSACTION ;
+        INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
+        VALUES (fromAccount,atmId,amount);
+        UPDATE account
+            SET AccountBalance = newBalance WHERE AccountId = fromAccount;
+        UPDATE ATMInformation
+            SET Amount = atmBalance WHERE ATMId= atmId;
+        UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'ATM HAS INSUFFICIENT FUNDS';
+    END IF ;
+  END
+$$
+DELIMITER ;
 
 DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
@@ -862,3 +923,29 @@ CREATE EVENT fixedDepositInterestEvent
 END
 $$
 DELIMITER ;
+
+
+# Loan application
+DELIMITER $$
+
+CREATE FUNCTION check_acount
+   (id Varchar(20), nic Varchar(12)) RETURNS boolean
+BEGIN
+DECLARE result boolean;
+DECLARE newID VARCHAR(20);
+
+SELECT COUNT(CustomerId) into newID from IndividualCustomer WHERE CustomerId=id AND NIC=nic;
+
+IF newID>0 then
+  SET result = TRUE ;
+ELSE
+  SET result = FALSE ;
+end if;
+
+
+RETURN result;
+
+END $$
+
+DELIMITER ;
+
