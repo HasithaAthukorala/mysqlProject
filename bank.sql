@@ -701,3 +701,5 @@ RETURN result;
 END $$
 
 DELIMITER ;
+
+CREATE PROCEDURE set_guarntor
