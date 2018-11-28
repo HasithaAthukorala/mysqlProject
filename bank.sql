@@ -57,7 +57,7 @@ CREATE TABLE IndividualCustomer (
   EmployementStatus ENUM ('Married', 'Unmarried') NOT NULL,
   NIC               VARCHAR(12)                   NOT NULL,
   PRIMARY KEY (CustomerId),
-  FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId)
+  FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId) ON DELETE CASCADE
 );
 
 -- to validate birthdays
@@ -98,6 +98,36 @@ CREATE TABLE Interest (
   interest       DECIMAL(13, 2) NOT NULL,
   MinimumBalance DECIMAL(13, 2) NOT NULL
 );
+
+-- to validate interests and minimum balances
+DELIMITER $$
+
+CREATE PROCEDURE `check_rates_balances`(IN interest DECIMAL(13,2), IN minimum_bal DECIMAL(13,2))
+  BEGIN
+    IF interest < 0
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Interest is incorrect!';
+    end if;
+
+    IF minimum_bal < 0
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Minimum balance is incorrect!';
+    end if;
+  END$$
+DELIMITER ;
+
+-- before insert to interest table
+DELIMITER $$
+CREATE TRIGGER `check_rates_minimum_balance_when_insert`
+  BEFORE INSERT
+  ON `Interest`
+  FOR EACH ROW
+  BEGIN
+    CALL check_rates_balances(new.interest, new.MinimumBalance);
+  END$$
+DELIMITER ;
 
 
 CREATE TABLE Nominee (
@@ -220,7 +250,7 @@ DELIMITER $$
 
 -- when updating an account balance
 CREATE TRIGGER `check_account_balance_when_update`
-  BEFORE INSERT
+  BEFORE UPDATE
   ON `Account`
   FOR EACH ROW
   BEGIN
@@ -308,6 +338,7 @@ CREATE TRIGGER `check_savings_account_when_insert`
     CALL insert_savings_account(new.AccountId, new.accountType);
   END$$
 DELIMITER ;
+
 
 CREATE TABLE FixedDeposit (
   FDid      VARCHAR(20)   NOT NULL,
@@ -1056,6 +1087,8 @@ CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
   END
 $$
 DELIMITER ;
+
+DELIMITER $$
 
 CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN purpose        TEXT,
