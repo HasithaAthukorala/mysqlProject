@@ -699,19 +699,19 @@ WHERE EXISTS(SELECT passsword
                AND passsword = MD5('0773842106')
                AND role = 'user');
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Children",12,0);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
  VALUES ("Teen",11,500);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Adult",10,1000);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
 
-INSERT INTO `fdtype`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
+INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
 
 
 INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
@@ -727,7 +727,7 @@ VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, 
 INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
 
-INSERT INTO `individualcustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
+INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
 
 
 INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
@@ -740,19 +740,19 @@ VALUES ('BRHORANA001', 'EMP001');
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
 VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
 
-INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
+INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
 VALUES ('ACC001',"Adult");
 
 BEGIN;
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
 VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
 
-INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
+INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
 VALUES ('ACC002',"Teen");
 COMMIT;
 
-UPDATE `account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
-UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
+UPDATE `Account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
+UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 
 
 
@@ -763,9 +763,9 @@ UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 # INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
 # VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
 
-INSERT INTO `atminformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
+INSERT INTO `ATMInformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
 
-INSERT INTO `atmcard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
+INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
 CREATE VIEW branchDetailView AS
 SELECT branchCode,branchName FROM Branch;
 
@@ -789,15 +789,15 @@ CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount
     DECLARE newBalance_from DECIMAL(13,2);
     DECLARE newBalance_to DECIMAL(13,2);
     DECLARE withdrawals INT(11);
-    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
-    SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
-    SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM SavingsAccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance_from = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) - amount;
+    SET newBalance_to = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) + amount;
     START TRANSACTION ;
       INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
       VALUES (fromAccount,toAccount,branchCode,amount);
-      UPDATE account
+      UPDATE Account
           SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
-      UPDATE account
+      UPDATE Account
           SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
       UPDATE SavingsAccount
             SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
@@ -812,14 +812,14 @@ CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN
     DECLARE newBalance DECIMAL(13,2);
     DECLARE atmBalance DECIMAL(13,2);
     DECLARE withdrawals INT(11);
-    SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
-    SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
-    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) - amount;
+    SET atmBalance =(SELECT Amount FROM ATMInformation WHERE atmId=ATMInformation.ATMId) - amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM SavingsAccount WHERE AccountId = fromAccount) + 1;
     IF atmBalance > 0 THEN
       START TRANSACTION ;
         INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
         VALUES (fromAccount,atmId,amount);
-        UPDATE account
+        UPDATE Account
             SET AccountBalance = newBalance WHERE AccountId = fromAccount;
         UPDATE ATMInformation
             SET Amount = atmBalance WHERE ATMId= atmId;
@@ -896,7 +896,7 @@ CREATE EVENT savingAccountInterestCalculationEvent
   DO
     BEGIN
       START TRANSACTION ;
-      UPDATE account
+      UPDATE Account
         SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM SavingsAccount left join Interest on SavingsAccount.accountType = Interest.accountType where Account.AccountId = SavingsAccount.AccountId)
         WHERE AccountId IN (
             SELECT AccountId FROM SavingsAccount
@@ -918,7 +918,7 @@ CREATE EVENT fixedDepositInterestEvent
   DO
     BEGIN
       START TRANSACTION ;
-      UPDATE account
+      UPDATE Account
         SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM FixedDeposit LEFT JOIN FDType T on FixedDeposit.typeId = T.typeId where Account.AccountId = FixedDeposit.AccountId)
         WHERE AccountId IN (
             SELECT AccountId FROM FixedDeposit WHERE nextInterestDate = CURDATE()
@@ -1085,7 +1085,7 @@ GRANT SELECT ON bank.* TO 'emp'@'localhost';
 GRANT EXECUTE ON bank.* TO 'emp'@'localhost';
 
 CREATE USER IF NOT EXISTS 'guest'@'localhost' IDENTIFIED BY 'guest';
-GRANT SELECT ON bank.userloginview TO 'guest'@'localhost';
+GRANT SELECT ON bank.userLoginView TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
-GRANT INSERT ON bank.loanapplicaton TO 'usr'@'localhost';
+GRANT INSERT ON bank.LoanApplicaton TO 'usr'@'localhost';
