@@ -7,6 +7,37 @@ CREATE TABLE FDType (
   time     INT NOT NULL,
   PRIMARY KEY (typeId)
 );
+
+-- to validate fdtype
+DELIMITER $$
+
+CREATE PROCEDURE `check_fdtypes`(IN interest DECIMAL(13,2), IN time INT)
+  BEGIN
+    IF interest < 0
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Interest is incorrect!';
+    end if;
+
+    IF time < 0
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Time is incorrect!';
+    end if;
+  END$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER `check_fdtypes_before_insert`
+  BEFORE INSERT
+  ON `FDType`
+  FOR EACH ROW
+  BEGIN
+    CALL check_fdtypes(new.interest, new.time);
+  END$$
+DELIMITER ;
+
+
 CREATE TABLE Customer (
   CustomerId   VARCHAR(20),
   Address      TEXT NOT NULL,
