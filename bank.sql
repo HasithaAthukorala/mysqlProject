@@ -48,7 +48,7 @@ CREATE TABLE Customer (
   PRIMARY KEY (CustomerId)
 );
 
-INSERT INTO Customer VALUES ("ABC02", "Matara", "0716492763", "kas@gmail.com");
+
 
 DELIMITER $$
 CREATE PROCEDURE `check_num`(IN phone VARCHAR(20))
@@ -448,9 +448,7 @@ CREATE TABLE LoanInterest (
   PRIMARY KEY (loanType)
 );
 
-INSERT INTO LoanInterest VALUES ("1",5,12);
-INSERT INTO LoanInterest VALUES ("2",10,24);
-INSERT INTO LoanInterest VALUES ("3",15,36);
+
 
 CREATE TABLE LoanApplicaton (
   applicationID     INT                  NOT NULL AUTO_INCREMENT,
@@ -775,74 +773,7 @@ WHERE EXISTS(SELECT passsword
                AND passsword = MD5('0773842106')
                AND role = 'user');
 
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Children",12,0);
 
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
- VALUES ("Teen",11,500);
-
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Adult",10,1000);
-
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Senior",13,1000);
-
-INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
-
-
-
-INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
-VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
-
-INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
-VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
-
-INSERT INTO `ATMInformation` (ATMId, OfficerInCharge, location, branchCode, Amount) VALUES ('ATM0001','EMP001','atmlocation1','BRHORANA001',20000);
-# INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
-# VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
-
-
-INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
-VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
-
-INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
-
-
-INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
-VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
-
-INSERT INTO `BranchManager` (`branchID`, `employeeID`)
-VALUES ('BRHORANA001', 'EMP001');
-
-
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
-VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
-
-INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
-VALUES ('ACC001',"Adult");
-
-BEGIN;
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
-VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
-
-INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
-VALUES ('ACC002',"Teen");
-COMMIT;
-
-UPDATE `Account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
-UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
-
-
-
-# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-# VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
-#
-#
-# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-# VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
-
-
-INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
 CREATE VIEW branchDetailView AS
 SELECT branchCode,branchName FROM Branch;
 
@@ -953,7 +884,7 @@ CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
  $$
 DELIMITER ;
 
-CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
+
 
 DELIMITER $$
  CREATE PROCEDURE createFixedDeposit(IN FDid VARCHAR(20),
@@ -975,8 +906,6 @@ DELIMITER $$
   END
 $$
 DELIMITER ;
-
-CALL createFixedDeposit('FD0001','ACC004','FDT001',50000.00);
 
 # time based events
 SET GLOBAL event_scheduler = 1;
@@ -1140,7 +1069,7 @@ $$
 DELIMITER ;
 
 
-call payLoanInstallment(1);
+
 
 DELIMITER $$
 
@@ -1271,17 +1200,8 @@ CREATE PROCEDURE `validate_online_loan`(IN customerID VARCHAR(20),
 
   END$$
 
-CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",1000.00,"2018-11-29","2019-11-29");
-CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",2000.00,"2018-11-29","2019-11-29");
 
 DELIMITER ;
-
-
-CALL create_loanApplication("ABC01","Loan","sda","asda","sadas","ABC02","1",50000.00,"2018-11-28","2019-11-28");
-
-SELECT CAST(DATEDIFF("2019-11-28","2018-11-28")/30 AS INT);
-CALL approveLoanApplication(1);
-
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
 GRANT SELECT ON bank.* TO 'emp'@'localhost';
@@ -1302,3 +1222,79 @@ GRANT EXECUTE ON PROCEDURE  bank.validate_online_loan TO 'usr'@'localhost';
 
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
+
+INSERT INTO Customer VALUES ("ABC02", "Matara", "0716492763", "kas@gmail.com");
+INSERT INTO LoanInterest VALUES ("1",5,12);
+INSERT INTO LoanInterest VALUES ("2",10,24);
+INSERT INTO LoanInterest VALUES ("3",15,36);
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Children",12,0);
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
+ VALUES ("Teen",11,500);
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Adult",10,1000);
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Senior",13,1000);
+INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
+
+INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
+VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
+
+INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
+VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
+
+INSERT INTO `ATMInformation` (ATMId, OfficerInCharge, location, branchCode, Amount) VALUES ('ATM0001','EMP001','atmlocation1','BRHORANA001',20000);
+# INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
+# VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
+
+
+INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
+VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
+
+INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
+
+
+INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
+VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
+
+INSERT INTO `BranchManager` (`branchID`, `employeeID`)
+VALUES ('BRHORANA001', 'EMP001');
+
+
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
+VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
+
+INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
+VALUES ('ACC001',"Adult");
+
+BEGIN;
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
+VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
+
+INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
+VALUES ('ACC002',"Teen");
+COMMIT;
+
+UPDATE `Account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
+UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
+
+
+
+# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+# VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
+#
+#
+# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+# VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
+
+CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
+CALL createFixedDeposit('FD0001','ACC004','FDT001',50000.00);
+INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
+
+call payLoanInstallment(1);
+
+CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",1000.00,"2018-11-29","2019-11-29");
+CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",2000.00,"2018-11-29","2019-11-29");
+CALL create_loanApplication("ABC01","Loan","sda","asda","sadas","ABC02","1",50000.00,"2018-11-28","2019-11-28");
+
+CALL approveLoanApplication(1);
