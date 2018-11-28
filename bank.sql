@@ -909,7 +909,6 @@ END
 $$
 DELIMITER ;
 
-
 # Loan application
 DELIMITER $$
 
@@ -926,7 +925,6 @@ IF newID>0 then
 ELSE
   SET result = FALSE ;
 end if;
-
 
 RETURN result;
 
