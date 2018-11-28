@@ -184,7 +184,7 @@ CREATE TABLE FixedDeposit (
   AccountId VARCHAR(20)   NOT NULL,
   typeId    VARCHAR(20)   NOT NULL,
   amount    DECIMAL(13, 2) NOT NULL,
-  nextInterestDate DATETIME NOT NULL,
+  nextInterestDate DATE NOT NULL,
   PRIMARY KEY (FDid),
   FOREIGN KEY (typeId) REFERENCES FDType (typeId),
   FOREIGN KEY (AccountId) REFERENCES SavingsAccount (AccountId)    ON DELETE CASCADE
@@ -617,7 +617,7 @@ DELIMITER $$
                                     IN amount DECIMAL(13,2))
   BEGIN
     DECLARE nextInterestDate DATETIME;
-    SET nextInterestDate = DATE_ADD(NOW(), INTERVAL 30 DAY);
+    SET nextInterestDate = DATE_ADD(CURDATE(), INTERVAL 30 DAY);
     IF amount > 0 THEN
       START TRANSACTION;
         INSERT INTO FixedDeposit(`FDid`,`AccountId`,`typeId`,`amount`,`nextInterestDate`)
@@ -655,3 +655,25 @@ END
 $$
 DELIMITER ;
 
+
+
+SELECT * FROM FixedDeposit LEFT JOIN FDType T on FixedDeposit.typeId = T.typeId;
+
+DELIMITER $$
+CREATE EVENT fixedDepositInterestEvent
+  ON SCHEDULE EVERY '1' DAY
+  DO
+    BEGIN
+      START TRANSACTION ;
+      UPDATE account
+        SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM FixedDeposit LEFT JOIN FDType T on FixedDeposit.typeId = T.typeId where Account.AccountId = FixedDeposit.AccountId)
+        WHERE AccountId IN (
+            SELECT AccountId FROM FixedDeposit WHERE nextInterestDate = CURDATE()
+            );
+      UPDATE FixedDeposit
+          SET nextInterestDate = DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+          WHERE nextInterestDate = curdate();
+      COMMIT ;
+END
+$$
+DELIMITER ;
