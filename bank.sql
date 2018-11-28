@@ -201,6 +201,13 @@ CREATE TABLE Gurantor (
   PRIMARY KEY (nicNumber)
 );
 
+CREATE TABLE LoanInterest (
+  loanType            ENUM ("1", "2", "3"),
+  interest            FLOAT NOT NULL,
+  installmentDuration INT   NOT NULL,
+  PRIMARY KEY (loanType)
+);
+
 CREATE TABLE LoanApplicaton (
   applicationID     INT     NOT NULL AUTO_INCREMENT,
   gurrantorID       VARCHAR(10),
@@ -209,16 +216,21 @@ CREATE TABLE LoanApplicaton (
   collateralType    TEXT    NOT NULL,
   collateraNotes    TEXT    NOT NULL,
   applicationStatus BOOLEAN NOT NULL,
+  customerID           VARCHAR(20)          NOT NULL,
+  loanType             ENUM ("1", "2", "3") NOT NULL,
+  loanAmount           DECIMAL(13, 2)        NOT NULL,
+  startDate            DATE                 NOT NULL,
+  endDate              DATE                 NOT NULL,
+  nextInstallmentDate  DATE                 NOT NULL,
+  nextInstallment      DECIMAL(13, 2)       NOT NULL,
+  numberOfInstallments INT                  NOT NULL,
   PRIMARY KEY (applicationID),
-  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (nicNumber)
+  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (nicNumber),
+  FOREIGN KEY (customerID) REFERENCES Customer(CustomerId),
+  FOREIGN KEY (loanType) REFERENCES LoanInterest(loanType)
 );
 
-CREATE TABLE LoanInterest (
-  loanType            ENUM ("1", "2", "3"),
-  interest            FLOAT NOT NULL,
-  installmentDuration INT   NOT NULL,
-  PRIMARY KEY (loanType)
-);
+
 
 # Validation for LoanInterest table
 DELIMITER $$
@@ -463,7 +475,6 @@ DETERMINISTIC
   BEGIN
     DECLARE remained_amount DECIMAL(13, 2);
     SET remained_amount = (old_balance - transaction_amount);
-
     IF remained_amount < 0
     THEN
       RETURN false;
@@ -581,6 +592,10 @@ SELECT username,passsword,role FROM UserLogin;
 CREATE VIEW accountTypeDetails AS
 SELECT accountType FROM Interest;
 
+CREATE VIEW pendingLoanStatus AS
+SELECT applicationID, applicationStatus FROM LoanApplicaton;
+
+
 DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
                                     IN CustomerId VARCHAR(20),
@@ -609,6 +624,19 @@ DELIMITER ;
 
 CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
 
+
+DELIMITER $$
+CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
+  BEGIN
+    START TRANSACTION ;
+      UPDATE pendingLoanStatus
+          SET applicationStatus = 1 WHERE applicationID = _applicationID;
+      INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
+      SELECT customerID,loanType,loanAmount,startDate,endDate,nextInstallmentDate,nextInstallment,numberOfInstallments,applicationID FROM loanapplicaton;
+    COMMIT ;
+  END
+$$
+DELIMITER ;
 
 DELIMITER $$
  CREATE PROCEDURE createFixedDeposit(IN FDid VARCHAR(20),
@@ -655,8 +683,6 @@ END
 $$
 DELIMITER ;
 
-
-
 SELECT * FROM FixedDeposit LEFT JOIN FDType T on FixedDeposit.typeId = T.typeId;
 
 DELIMITER $$
@@ -677,6 +703,7 @@ CREATE EVENT fixedDepositInterestEvent
 END
 $$
 DELIMITER ;
+
 
 # Loan application
 DELIMITER $$
@@ -701,3 +728,15 @@ RETURN result;
 END $$
 
 DELIMITER ;
+
+# roles and privileges
+CREATE ROLE 'guest','admin','employee';
+
+GRANT SELECT ON bank.userloginview TO 'guest';
+
+GRANT ALL ON bank.* TO 'admin';
+
+GRANT SELECT ON bank.* TO 'employee';
+GRANT ALL ON bank.accountdetailsview TO 'employee';
+GRANT ALL ON bank.pendingLoanStatus TO 'employee';
+
