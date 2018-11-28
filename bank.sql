@@ -752,6 +752,9 @@ SELECT branchCode,branchName FROM Branch;
 CREATE VIEW accountDetailsView AS
 SELECT AccountID,customerID,branchCode,AccountBalance,NomineeId FROM Account;
 
+CREATE VIEW customerDetailView AS
+SELECT CustomerId,FirstName,LastName FROM IndividualCustomer;
+
 CREATE VIEW userLoginView AS
 SELECT username,passsword,role FROM UserLogin;
 
@@ -932,6 +935,7 @@ END $$
 
 DELIMITER ;
 
+
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
 
@@ -944,3 +948,5 @@ GRANT SELECT ON bank.userloginview TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
 GRANT INSERT ON bank.loanapplicaton TO 'usr'@'localhost';
+GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
+
