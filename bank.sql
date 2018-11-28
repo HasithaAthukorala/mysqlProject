@@ -99,6 +99,7 @@ CREATE TABLE Interest (
   MinimumBalance DECIMAL(13, 2) NOT NULL
 );
 
+
 CREATE TABLE Nominee (
   NomineeId VARCHAR(20) PRIMARY KEY,
   Name      VARCHAR(20) NOT NULL,
@@ -347,13 +348,27 @@ DELIMITER ;
 
 
 CREATE TABLE Gurantor (
-  nicNumber VARCHAR(10) NOT NULL,
-  name      varchar(20) NOT NULL,
-  address   TEXT        NOT NULL,
-  phone     VARCHAR(10) NOT NULL,
+  gurantoID VARCHAR(20) NOT NULL,
   NoOfLoans INT(2),
-  PRIMARY KEY (nicNumber)
+  PRIMARY KEY (gurantoID),
+  FOREIGN KEY (gurantoID) REFERENCES Customer (CustomerId)
 );
+
+DELIMITER $$
+CREATE TRIGGER `parts_before_update_Gurantor`
+  BEFORE UPDATE
+  ON `Gurantor`
+  FOR EACH ROW
+  BEGIN
+    DECLARE count INT(2);
+    SELECT NoOfLoans INTO count FROM `Gurantor` WHERE gurantoID = NEW.gurantoID;
+    SET count = count + 1;
+    IF count>3 THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Guranor has already guranterd for 3 loans';
+    end if ;
+  END$$
+DELIMITER ;
 
 CREATE TABLE LoanInterest (
   loanType            ENUM ("1", "2", "3"),
@@ -363,15 +378,22 @@ CREATE TABLE LoanInterest (
 );
 
 CREATE TABLE LoanApplicaton (
-  applicationID     INT     NOT NULL AUTO_INCREMENT,
-  gurrantorID       VARCHAR(10),
-  purpose           TEXT    NOT NULL,
-  sourceOfFunds     TEXT    NOT NULL,
-  collateralType    TEXT    NOT NULL,
-  collateraNotes    TEXT    NOT NULL,
-  applicationStatus BOOLEAN NOT NULL,
+  applicationID     INT                  NOT NULL AUTO_INCREMENT,
+  gurrantorID       VARCHAR(20),
+  purpose           TEXT                 NOT NULL,
+  sourceOfFunds     TEXT                 NOT NULL,
+  collateralType    TEXT                 NOT NULL,
+  collateraNotes    TEXT                 NOT NULL,
+  applicationStatus BOOLEAN              NOT NULL,
+  customerID        VARCHAR(20)          NOT NULL,
+  loanType          ENUM ("1", "2", "3") NOT NULL,
+  loanAmount        DECIMAL(13, 2)       NOT NULL,
+  startDate         DATE                 NOT NULL,
+  endDate           DATE                 NOT NULL,
   PRIMARY KEY (applicationID),
-  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (nicNumber)
+  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (gurantoID),
+  FOREIGN KEY (customerID) REFERENCES Customer (CustomerId),
+  FOREIGN KEY (loanType) REFERENCES LoanInterest (loanType)
 );
 
 
@@ -909,31 +931,154 @@ END
 $$
 DELIMITER ;
 
+
 # Loan application
 DELIMITER $$
 
 CREATE FUNCTION check_acount
-   (id Varchar(20), nic Varchar(12)) RETURNS boolean
-BEGIN
-DECLARE result boolean;
-DECLARE newID VARCHAR(20);
+  (id Varchar(20))
+  RETURNS boolean
+  BEGIN
+    DECLARE result boolean;
+    DECLARE newID INT;
 
-SELECT COUNT(CustomerId) into newID from IndividualCustomer WHERE CustomerId=id AND NIC=nic;
+    SELECT COUNT(CustomerId) into newID from Customer WHERE CustomerId = id;
 
-IF newID>0 then
-  SET result = TRUE ;
-ELSE
-  SET result = FALSE ;
-end if;
+    IF newID > 0
+    then
+      SET result = TRUE;
+    ELSE
+      SET result = FALSE;
+    end if;
 
-RETURN result;
 
-END $$
+    RETURN result;
+
+  END $$
 
 DELIMITER ;
 
-CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
-GRANT ALL ON bank.* TO 'adm'@'localhost';
+DELIMITER $$
+
+CREATE PROCEDURE update_loanCount(id VARCHAR(20))
+  BEGIN
+    DECLARE count INT(2);
+    SELECT NoOfLoans INTO count FROM Gurantor WHERE gurantoID = id;
+    SET count = count + 1;
+    UPDATE Gurantor SET NoOfLoans = count WHERE gurantoID = id;
+  END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE FUNCTION check_gurantor
+  (id Varchar(20))
+  RETURNS boolean
+  BEGIN
+    DECLARE result boolean;
+    DECLARE newID INT;
+
+    SELECT COUNT(gurantoID) into newID from Gurantor WHERE gurantoID = id;
+
+    IF newID > 0
+    then
+      SET result = TRUE;
+    ELSE
+      SET result = FALSE;
+    end if;
+
+
+    RETURN result;
+
+  END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
+                                        IN purpose        TEXT,
+                                        IN sourceOfFunds  TEXT,
+                                        IN collateralType TEXT,
+                                        IN collateraNotes TEXT,
+                                        IN customerID     VARCHAR(20),
+                                        IN loanType       ENUM ("1", "2", "3"),
+                                        IN loanAmount     DECIMAL(13, 2),
+                                        IN startDate      DATE,
+                                        IN endDate        DATE)
+  BEGIN
+    IF check_acount(customerID)
+    THEN
+      IF check_acount(gurrantorID)
+      THEN
+        IF check_gurantor(gurrantorID)
+        THEN
+          START TRANSACTION ;
+          CALL update_loanCount(gurrantorID);
+          INSERT INTO `LoanApplicaton` (`gurrantorID`,
+                                        `purpose`,
+                                        `sourceOfFunds`,
+                                        `collateralType`,
+                                        `collateraNotes`,
+                                        `applicationStatus`,
+                                        `customerID`,
+                                        `loanType`,
+                                        `loanAmount`,
+                                        `startDate`,
+                                        `endDate`)
+          VALUES (gurrantorID,
+                  purpose,
+                  sourceOfFunds,
+                  collateralType,
+                  collateraNotes,
+                  FALSE,
+                  customerID,
+                  loanType,
+                  loanAmount,
+                  startDate,
+                  endDate);
+          COMMIT ;
+        ELSE
+          START TRANSACTION ;
+          INSERT INTO Gurantor VALUES (gurrantorID, 1);
+          INSERT INTO `LoanApplicaton` (`gurrantorID`,
+                                        `purpose`,
+                                        `sourceOfFunds`,
+                                        `collateralType`,
+                                        `collateraNotes`,
+                                        `applicationStatus`,
+                                        `customerID`,
+                                        `loanType`,
+                                        `loanAmount`,
+                                        `startDate`,
+                                        `endDate`)
+          VALUES (gurrantorID,
+                  purpose,
+                  sourceOfFunds,
+                  collateralType,
+                  collateraNotes,
+                  FALSE,
+                  customerID,
+                  loanType,
+                  loanAmount,
+                  startDate,
+                  endDate);
+          COMMIT ;
+        end if;
+      ELSE
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No such Gurantor exists';
+      end if;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'No such Customer exists';
+    END IF;
+  end $$
+
+DELIMITER ;
+
+
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
 GRANT SELECT ON bank.* TO 'emp'@'localhost';
