@@ -537,44 +537,6 @@ CREATE TABLE OnlineLoan (
 );
 
 -- validate online loan
-DELIMITER $$
-CREATE PROCEDURE `validate_online_loan`(IN customerID VARCHAR(20),
-                                        IN purpose TEXT,
-                                        IN sourceOfFunds TEXT,
-                                        IN collateralType TEXT,
-                                        IN collateralNotes TEXT,
-                                        IN loanType ENUM("1", "2", "3"),
-                                        IN fd VARCHAR(20),
-                                        IN loanAmount DECIMAL(13,2),
-                                        IN startDate DATE,
-                                        IN endDate DATE,
-                                        IN applicationID VARCHAR(20))
-
-
-  BEGIN
-    DECLARE FDAmount DECIMAL(13,2);
-    DECLARE loanID INT;
-    CALL create_loanApplication(customerID, purpose, sourceOfFunds, collateralType, collateraNotes, customerID, loanType, loanAmount, startDate, endDate);
-    SET FDAmount = (SELECT amount FROM fixeddeposit WHERE AccountiD = fd);
-    IF  amount > FDAmount*0.6 OR amount > 500000
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Requesting loan amount is unacceptable';
-    ELSE
-      START TRANSACTION ;
-        CALL approveLoanApplication(applicationID);
-        SET loanID = (SELECT loanID FROM loan WHERE loan.applicationID = applicationID);
-        INSERT INTO `onlineloan`(`loanID`, `FDid`) VALUES (loanID,fd);
-      COMMIT ;
-
-      CALL approveLoanApplication(applicationID);
-
-
-    END IF;
-
-  END$$
-
-DELIMITER ;
 
 
 # validation for Loan table
@@ -1154,11 +1116,27 @@ CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
       UPDATE pendingLoanStatus
           SET applicationStatus = 1 WHERE applicationID = _applicationID;
       INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
-      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/DATEDIFF(startDate,endDate)/30,DATEDIFF(startDate,endDate)/30,applicationID FROM loanapplicaton;
+      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/CAST(DATEDIFF(endDate,startDate)/30 AS INT),CAST(DATEDIFF(endDate,startDate)/30 AS INT),applicationID FROM loanapplicaton;
     COMMIT ;
   END
 $$
 DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE payLoanInstallment(IN _loanID INT(11))
+  BEGIN
+    START TRANSACTION ;
+      UPDATE Loan
+          SET nextInstallmentDate = DATE_ADD(nextInstallmentDate,INTERVAL 30 DAY)  WHERE loanID = _loanID;
+      UPDATE Loan
+          SET loanAmount = (loanAmount-nextInstallment) WHERE loanID = _loanID;
+      COMMIT ;
+  END
+$$
+DELIMITER ;
+
+
+call payLoanInstallment(1);
 
 DELIMITER $$
 
@@ -1248,6 +1226,57 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
   end
 $$
 DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE `validate_online_loan`(IN customerID VARCHAR(20),
+                                        IN purpose TEXT,
+                                        IN sourceOfFunds TEXT,
+                                        IN collateralType TEXT,
+                                        IN collateralNotes TEXT,
+                                        IN loanType ENUM("1", "2", "3"),
+                                        IN fd VARCHAR(20),
+                                        IN loanAmount DECIMAL(13,2),
+                                        IN startDate DATE,
+                                        IN endDate DATE)
+
+
+  BEGIN
+    DECLARE FDAmount DECIMAL(13,2);
+    DECLARE _loanID INT;
+    DECLARE applicationID INT;
+    START TRANSACTION;
+      CALL create_loanApplication(customerID, purpose, sourceOfFunds, collateralType, collateralNotes, customerID, loanType, loanAmount, startDate, endDate);
+      SET applicationID = (SELECT applicationID FROM LoanApplicaton ORDER BY applicationID DESC LIMIT 1);
+    COMMIT;
+    SET FDAmount = (SELECT amount FROM fixeddeposit WHERE AccountiD = fd);
+    IF  loanAmount > FDAmount*0.6 OR loanAmount > 500000
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Requesting loan amount is unacceptable';
+    ELSE
+      START TRANSACTION ;
+        CALL approveLoanApplication(applicationID);
+        SET _loanID = (SELECT loanID FROM Loan ORDER BY loanID DESC LIMIT 1);
+        INSERT INTO `OnlineLoan`(`loanID`, `FDid`) VALUES (_loanID,fd);
+      COMMIT ;
+
+      CALL approveLoanApplication(applicationID);
+
+
+    END IF;
+
+  END$$
+
+CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",1000.00,"2018-11-29","2019-11-29");
+CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",2000.00,"2018-11-29","2019-11-29");
+
+DELIMITER ;
+
+
+CALL create_loanApplication("ABC01","Loan","sda","asda","sadas","ABC02","1",50000.00,"2018-11-28","2019-11-28");
+
+SELECT CAST(DATEDIFF("2019-11-28","2018-11-28")/30 AS INT);
+CALL approveLoanApplication(1);
 
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
