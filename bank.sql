@@ -47,6 +47,8 @@ CREATE TRIGGER `parts_before_update`
   END$$
 DELIMITER ;
 
+
+
 CREATE TABLE IndividualCustomer (
   CustomerId        VARCHAR(20),
   FirstName         TEXT                          NOT NULL,
@@ -58,6 +60,30 @@ CREATE TABLE IndividualCustomer (
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId)
 );
 
+-- to validate birthdays
+DELIMITER $$
+
+CREATE PROCEDURE `check_birthday`(IN dob DATE)
+  BEGIN
+    IF dob > NOW()
+    THEN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Date of Birth is incorrect!';
+    end if;
+  END$$
+DELIMITER ;
+
+-- validate birthday of new customer
+DELIMITER $$
+CREATE TRIGGER `check_birthday_before_insert`
+  BEFORE INSERT
+  ON `IndividualCustomer`
+  FOR EACH ROW
+  BEGIN
+    CALL check_birthday(new.DateOfBirth);
+  END$$
+DELIMITER ;
+
 CREATE TABLE Organization (
   CustomerId       VARCHAR(20),
   organizationName TEXT NOT NULL,
@@ -65,7 +91,7 @@ CREATE TABLE Organization (
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId)
 );
 
-#Isuru
+
 
 CREATE TABLE Interest (
   accountType    VARCHAR(20) PRIMARY KEY,
@@ -117,26 +143,15 @@ CREATE TABLE Employee (
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
 );
 
-DELIMITER $$
-
-CREATE PROCEDURE `check_employee_birthday`(IN dob DATE)
-  BEGIN
-    IF dob > NOW()
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Date of Birth is incorrect!';
-    end if;
-  END$$
-DELIMITER ;
 
 -- before insert to employee
 DELIMITER $$
-CREATE TRIGGER `check_employee_before_insert`
+CREATE TRIGGER `check_employee_birthday_before_insert`
   BEFORE INSERT
   ON `Employee`
   FOR EACH ROW
   BEGIN
-    CALL check_employee_birthday(new.dateOfBirth);
+    CALL check_birthday(new.dateOfBirth);
   END$$
 DELIMITER ;
 
@@ -147,7 +162,7 @@ CREATE TRIGGER `check_employee_before_update`
   ON `Employee`
   FOR EACH ROW
   BEGIN
-    CALL check_employee_birthday(new.dateOfBirth);
+    CALL check_birthday(new.dateOfBirth);
   END$$
 DELIMITER ;
 
@@ -215,8 +230,11 @@ DELIMITER ;
 
 DELIMITER $$
 
-CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType VARCHAR(20))
+-- to validate no of withdrawals and account type
+CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType VARCHAR(20), IN AccountId VARCHAR(20) )
   BEGIN
+    DECLARE customer DATE;
+    SET customer = (SELECT DateOfBirth from Account  inner join IndividualCustomer on Account.CustomerId = IndividualCustomer.CustomerId where Account.AccountId = AccountId);
     IF noOfWithdrawals < 0
     THEN
       SIGNAL SQLSTATE '45000'
@@ -232,6 +250,8 @@ CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType 
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Account type is incorect...!';
     END IF;
+
+
   END$$
 
 DELIMITER ;
@@ -272,6 +292,8 @@ CREATE TABLE FixedDeposit (
 
 DELIMITER $$
 
+
+-- to validate fd amount
 CREATE PROCEDURE `check_fd_amount`(IN amount FLOAT(100,4))
   BEGIN
     IF amount < 0
@@ -614,6 +636,7 @@ CREATE TABLE UserLogin (
   passsword VARCHAR(32),
   role      ENUM ("admin", "user", "employee"),
   PRIMARY KEY (id)
+
 );
 
 DELIMITER $$
