@@ -578,7 +578,6 @@ SELECT username,passsword,role FROM UserLogin;
 CREATE VIEW accountTypeDetails AS
 SELECT accountType FROM Interest;
 
-DROP PROCEDURE createSavingAccount ;
 DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
                                     IN CustomerId VARCHAR(20),
@@ -606,6 +605,27 @@ CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
 DELIMITER ;
 
 CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
+
+SET GLOBAL event_scheduler = 1;
+
+DELIMITER $$
+CREATE EVENT savingAccountInterestCalculationEvent
+  ON SCHEDULE EVERY '1' MONTH
+  STARTS '2018-12-01 00:00:00'
+  DO
+    BEGIN
+      START TRANSACTION ;
+      UPDATE account
+        SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM SavingsAccount left join interest on SavingsAccount.accountType = Interest.accountType where Account.AccountId = SavingsAccount.AccountId)
+        WHERE AccountId IN (
+            SELECT AccountId FROM savingsaccount
+            );
+      UPDATE SavingsAccount
+          SET noOfWithdrawals = 0;
+      COMMIT ;
+END
+$$
+DELIMITER ;
 
 # Time based events
 SELECT * FROM Account;
