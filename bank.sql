@@ -555,9 +555,11 @@ CREATE TABLE ATMCard (
 CREATE TABLE UserLogin (
   id        INT AUTO_INCREMENT,
   username  VARCHAR(255),
+  CustomerId   VARCHAR(20),
   passsword VARCHAR(32),
   role      ENUM ("admin", "user", "employee"),
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  FOREIGN KEY (CustomerId) REFERENCES Customer(CustomerId)
 
 );
 
@@ -621,11 +623,8 @@ CREATE TRIGGER `parts_before_insert_transaction_normal`
   BEGIN
     DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
-    IF check_account_balance(old_balance, NEW.Amount) = true
+    IF check_account_balance(old_balance, NEW.Amount) = false
     THEN
-      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
-      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
-    ELSE
       SIGNAL SQLSTATE '45002'
       SET MESSAGE_TEXT = 'Account balance not enough to transfer';
     END IF;
@@ -640,11 +639,8 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
   BEGIN
     DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
-    IF check_account_balance(old_balance, NEW.Amount) = true
+    IF check_account_balance(old_balance, NEW.Amount) = false
     THEN
-      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
-      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
-    ELSE
       SIGNAL SQLSTATE '45002'
       SET MESSAGE_TEXT = 'Account balance is not enough to transfer';
     END IF;
@@ -652,8 +648,11 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
 DELIMITER ;
 
 #Insert Data
-INSERT INTO `UserLogin` (`id`, `username`, `passsword`, `role`)
-VALUES ('1', 'TESTOR01', MD5('0773842106'), 'user');
+INSERT INTO `UserLogin` (`id`, `username`, `CustomerId`, `passsword`, `role`)
+VALUES ('1', 'TESTOR01','ABC01', MD5('0773842106'), 'user');
+
+INSERT INTO `UserLogin` (`id`, `username`, `CustomerId`, `passsword`, `role`)
+VALUES (NULL , 'tester','ABC01', MD5('12345'), 'user');
 
 SELECT COUNT(*) AS 'result'
 FROM UserLogin
