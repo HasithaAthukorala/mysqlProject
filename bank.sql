@@ -1123,11 +1123,27 @@ CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
       UPDATE pendingLoanStatus
           SET applicationStatus = 1 WHERE applicationID = _applicationID;
       INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
-      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/DATEDIFF(startDate,endDate)/30,DATEDIFF(startDate,endDate)/30,applicationID FROM loanapplicaton;
+      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/CAST(DATEDIFF(endDate,startDate)/30 AS INT),CAST(DATEDIFF(endDate,startDate)/30 AS INT),applicationID FROM loanapplicaton;
     COMMIT ;
   END
 $$
 DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE payLoanInstallment(IN _loanID INT(11))
+  BEGIN
+    START TRANSACTION ;
+      UPDATE Loan
+          SET nextInstallmentDate = DATE_ADD(nextInstallmentDate,INTERVAL 30 DAY)  WHERE loanID = _loanID;
+      UPDATE Loan
+          SET loanAmount = (loanAmount-nextInstallment) WHERE loanID = _loanID;
+      COMMIT ;
+  END
+$$
+DELIMITER ;
+
+
+call payLoanInstallment(1);
 
 DELIMITER $$
 
@@ -1217,6 +1233,11 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
   end
 $$
 DELIMITER ;
+
+CALL create_loanApplication("ABC01","Loan","sda","asda","sadas","ABC02","1",50000.00,"2018-11-28","2019-11-28");
+
+SELECT CAST(DATEDIFF("2019-11-28","2018-11-28")/30 AS INT);
+CALL approveLoanApplication(1);
 
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
