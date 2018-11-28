@@ -722,10 +722,19 @@ CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
 DELIMITER $$
-CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN amount DECIMAL(13,2))
+CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN branchCode VARCHAR(20),IN amount DECIMAL(13,2))
   BEGIN
+    DECLARE newBalance_from DECIMAL(13,2);
+    DECLARE newBalance_to DECIMAL(13,2);
+    SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
     START TRANSACTION ;
-
+      INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
+      VALUES (fromAccount,toAccount,branchCode,amount);
+      UPDATE account
+          SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
+      UPDATE account
+          SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
     COMMIT;
   END
 $$
