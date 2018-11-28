@@ -99,7 +99,6 @@ CREATE TABLE Interest (
   MinimumBalance DECIMAL(13, 2) NOT NULL
 );
 
-
 CREATE TABLE Nominee (
   NomineeId VARCHAR(20) PRIMARY KEY,
   Name      VARCHAR(20) NOT NULL,
@@ -126,6 +125,7 @@ CREATE TRIGGER `parts_before_update_nominee`
     CALL check_num(new.Phone);
   END$$
 DELIMITER ;
+
 
 CREATE TABLE Branch (
   branchCode      VARCHAR(20) PRIMARY KEY,
@@ -214,11 +214,11 @@ CREATE PROCEDURE `check_balance`(IN AccBalance DECIMAL(13,2), IN AccId VARCHAR(2
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Account must keep the minimal balance';
     END IF;
-  END
-$$
-
+  END$$
 DELIMITER $$
-CREATE TRIGGER `check_account_balance`
+
+-- when updating an account balance
+CREATE TRIGGER `check_account_balance_when_update`
   BEFORE INSERT
   ON `Account`
   FOR EACH ROW
@@ -230,10 +230,8 @@ DELIMITER ;
 DELIMITER $$
 
 -- to validate no of withdrawals and account type
-CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType VARCHAR(20), IN AccountId VARCHAR(20) )
+CREATE PROCEDURE `update_savings_account`(IN noOfWithdrawals INT )
   BEGIN
-    DECLARE customer DATE;
-    SET customer = (SELECT DateOfBirth from Account  inner join IndividualCustomer on Account.CustomerId = IndividualCustomer.CustomerId where Account.AccountId = AccountId);
     IF noOfWithdrawals < 0
     THEN
       SIGNAL SQLSTATE '45000'
@@ -244,13 +242,6 @@ CREATE PROCEDURE `check_savings_account`(IN noOfWithdrawals INT, IN accountType 
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Withdrawal limit has been exceeded...!';
     END IF;
-    IF !(accountType IN("Children", "Adult", "Teen", "Senior"))
-    THEN
-      SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Account type is incorect...!';
-    END IF;
-
-
   END$$
 
 DELIMITER ;
@@ -262,22 +253,60 @@ CREATE TRIGGER `check_savings_account_when_update`
   ON `SavingsAccount`
   FOR EACH ROW
   BEGIN
-    CALL check_savings_account(new.noOfWithdrawals, new.accountType, new.AccountId);
+    CALL update_savings_account(new.noOfWithdrawals);
   END$$
 DELIMITER ;
 
--- when inserting to savings account
+DELIMITER $$
+
+-- to validate no of account type
+CREATE PROCEDURE `insert_savings_account`(IN account VARCHAR(20), IN type VARCHAR(20))
+  BEGIN
+    DECLARE dob DATE;
+    DECLARE  age INT;
+    SET dob = (SELECT DateOfBirth from Account  inner join IndividualCustomer on Account.CustomerId = IndividualCustomer.CustomerId where Account.AccountId = account);
+    SET age = DATEDIFF(CURDATE(),dob)/365;
+
+    IF type = "Children"
+      THEN
+        IF age > 18
+          THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Incorrect account type for this customer...!';
+        END IF;
+    END IF;
+
+    IF type = "Teen" OR type = "Adult"
+      THEN
+        IF age < 18
+          THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Incorrect account type for this customer...!';
+        END IF;
+    END IF;
+
+    IF type = "Senior"
+      THEN
+        IF age < 60 OR age < 18
+          THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Incorrect account type for this customer...!';
+        END IF;
+    END IF;
+  END$$
+
+DELIMITER ;
+
+-- when inserting to an savings account
 DELIMITER $$
 CREATE TRIGGER `check_savings_account_when_insert`
   BEFORE INSERT
   ON `SavingsAccount`
   FOR EACH ROW
   BEGIN
-    CALL check_savings_account(new.noOfWithdrawals, new.accountType, new.AccountId);
+    CALL insert_savings_account(new.AccountId, new.accountType);
   END$$
 DELIMITER ;
-
-
 
 CREATE TABLE FixedDeposit (
   FDid      VARCHAR(20)   NOT NULL,
@@ -344,9 +373,6 @@ CREATE TABLE LoanApplicaton (
   loanAmount           DECIMAL(13, 2)        NOT NULL,
   startDate            DATE                 NOT NULL,
   endDate              DATE                 NOT NULL,
-  nextInstallmentDate  DATE                 NOT NULL,
-  nextInstallment      DECIMAL(13, 2)       NOT NULL,
-  numberOfInstallments INT                  NOT NULL,
   PRIMARY KEY (applicationID),
   FOREIGN KEY (gurrantorID) REFERENCES Gurantor (gurantoID),
   FOREIGN KEY (customerID) REFERENCES Customer(CustomerId),
@@ -521,7 +547,7 @@ CREATE TABLE ATMInformation (
 );
 
 CREATE TABLE ATMTransaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   ATMId         VARCHAR(20) NOT NULL,
   TimeStamp     TIMESTAMP   NOT NULL,
@@ -531,7 +557,7 @@ CREATE TABLE ATMTransaction (
 );
 
 CREATE TABLE Transaction (
-  TransactionID varchar(20) PRIMARY KEY,
+  TransactionID INT PRIMARY KEY AUTO_INCREMENT,
   fromAccountID VARCHAR(20) NOT NULL,
   toAccountID   VARCHAR(20) NOT NULL,
   branchCode    VARCHAR(20) NOT NULL,
@@ -553,9 +579,11 @@ CREATE TABLE ATMCard (
 CREATE TABLE UserLogin (
   id        INT AUTO_INCREMENT,
   username  VARCHAR(255),
+  CustomerId   VARCHAR(20),
   passsword VARCHAR(32),
   role      ENUM ("admin", "user", "employee"),
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  FOREIGN KEY (CustomerId) REFERENCES Customer(CustomerId)
 
 );
 
@@ -599,6 +627,7 @@ DETERMINISTIC
   BEGIN
     DECLARE remained_amount DECIMAL(13, 2);
     SET remained_amount = (old_balance - transaction_amount);
+
     IF remained_amount < 0
     THEN
       RETURN false;
@@ -619,11 +648,8 @@ CREATE TRIGGER `parts_before_insert_transaction_normal`
   BEGIN
     DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
-    IF check_account_balance(old_balance, NEW.Amount) = true
+    IF check_account_balance(old_balance, NEW.Amount) = false
     THEN
-      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
-      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
-    ELSE
       SIGNAL SQLSTATE '45002'
       SET MESSAGE_TEXT = 'Account balance not enough to transfer';
     END IF;
@@ -638,20 +664,15 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
   BEGIN
     DECLARE old_balance DECIMAL(13, 2);
     SELECT AccountBalance INTO old_balance FROM `Account` WHERE AccountId = NEW.fromAccountID;
-    IF check_account_balance(old_balance, NEW.Amount) = true
+    IF check_account_balance(old_balance, NEW.Amount) = false
     THEN
-      UPDATE `Account` SET AccountBalance = (old_balance - NEW.Amount) WHERE AccountId = NEW.fromAccountID;
-      UPDATE `Account` SET AccountBalance = (old_balance + NEW.Amount) WHERE AccountId = NEW.toAccountID;
-    ELSE
       SIGNAL SQLSTATE '45002'
       SET MESSAGE_TEXT = 'Account balance is not enough to transfer';
     END IF;
   END$$
 DELIMITER ;
 
-#Insert Data
-INSERT INTO `UserLogin` (`id`, `username`, `passsword`, `role`)
-VALUES ('1', 'TESTOR01', MD5('0773842106'), 'user');
+
 
 SELECT COUNT(*) AS 'result'
 FROM UserLogin
@@ -660,6 +681,21 @@ WHERE EXISTS(SELECT passsword
              WHERE username = 'TESTOR01'
                AND passsword = MD5('0773842106')
                AND role = 'user');
+
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Children",12,0);
+
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+ VALUES ("Teen",11,500);
+
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Adult",10,1000);
+
+INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+VALUES ("Senior",13,1000);
+
+INSERT INTO `fdtype`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
+
 
 INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
 VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
@@ -670,8 +706,12 @@ VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, 
 # INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 # VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
 
+
 INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
+
+INSERT INTO `individualcustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
+
 
 INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
 VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
@@ -679,29 +719,36 @@ VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
 INSERT INTO `BranchManager` (`branchID`, `employeeID`)
 VALUES ('BRHORANA001', 'EMP001');
 
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
-VALUES ('ACC001', 'ABC01', 'BRHORANA001', '8000.0000', 'NOM1234');
 
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
-VALUES ('ACC002', 'ABC01', 'BRHORANA001', '7000.0000', 'NOM1234');
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
+VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
 
-INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
+INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
+VALUES ('ACC001',"Adult");
 
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Children",12,0);
+BEGIN;
+INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
+VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
 
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
- VALUES ("Teen",11,500);
+INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
+VALUES ('ACC002',"Teen");
+COMMIT;
 
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Adult",10,1000);
+UPDATE `account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
+UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 
-INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
-VALUES ("Senior",13,1000);
 
-INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
 
+# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+# VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
+#
+#
+# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
+# VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
+
+INSERT INTO `atminformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM000","EMP001","Horana Bazzar","BRHORANA001",8000000)
+
+INSERT INTO `atmcard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
 CREATE VIEW branchDetailView AS
 SELECT branchCode,branchName FROM Branch;
 
@@ -719,6 +766,56 @@ SELECT accountType FROM Interest;
 CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
+DELIMITER $$
+CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount VARCHAR(20),IN branchCode VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance_from DECIMAL(13,2);
+    DECLARE newBalance_to DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    SET newBalance_from = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET newBalance_to = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) + amount;
+    START TRANSACTION ;
+      INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
+      VALUES (fromAccount,toAccount,branchCode,amount);
+      UPDATE account
+          SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
+      UPDATE account
+          SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
+      UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+    COMMIT;
+  END
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance DECIMAL(13,2);
+    DECLARE atmBalance DECIMAL(13,2);
+    DECLARE withdrawals INT(11);
+    SET newBalance = (SELECT AccountBalance FROM account WHERE AccountId = fromAccount) - amount;
+    SET atmBalance =(SELECT Amount FROM atminformation WHERE atmId=ATMInformation.ATMId) - amount;
+    SET withdrawals = (SELECT 	noOfWithdrawals FROM savingsaccount WHERE AccountId = fromAccount) + 1;
+    IF atmBalance > 0 THEN
+      START TRANSACTION ;
+        INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
+        VALUES (fromAccount,atmId,amount);
+        UPDATE account
+            SET AccountBalance = newBalance WHERE AccountId = fromAccount;
+        UPDATE ATMInformation
+            SET Amount = atmBalance WHERE ATMId= atmId;
+        UPDATE SavingsAccount
+            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'ATM HAS INSUFFICIENT FUNDS';
+    END IF ;
+  END
+$$
+DELIMITER ;
 
 DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
@@ -748,19 +845,6 @@ DELIMITER ;
 
 CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
 
-
-DELIMITER $$
-CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
-  BEGIN
-    START TRANSACTION ;
-      UPDATE pendingLoanStatus
-          SET applicationStatus = 1 WHERE applicationID = _applicationID;
-      INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
-      SELECT customerID,loanType,loanAmount,startDate,endDate,nextInstallmentDate,nextInstallment,numberOfInstallments,applicationID FROM loanapplicaton;
-    COMMIT ;
-  END
-$$
-DELIMITER ;
 
 DELIMITER $$
  CREATE PROCEDURE createFixedDeposit(IN FDid VARCHAR(20),
@@ -853,5 +937,11 @@ END $$
 
 DELIMITER ;
 
+# ROLES AND PRIVILEGES
+CREATE ROLE 'user','admin','employee','guest';
 
-
+GRANT SELECT ON bank.userloginview TO 'guest';
+GRANT ALL ON bank.* TO 'admin';
+GRANT SELECT ON bank.* TO 'employee';
+GRANT EXECUTE ON bank.* TO 'employee';
+GRANT INSERT ON bank.loanapplicaton TO 'user';
