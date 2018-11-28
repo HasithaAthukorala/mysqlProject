@@ -867,7 +867,7 @@ CREATE VIEW transactionHistoryView AS
 SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM Account JOIN Transaction T on Account.AccountId = T.fromAccountID LIMIT 1) AS fromCustomerId ,(SELECT  CustomerId FROM Account JOIN Transaction T on Account.AccountId = T.toAccountID LIMIT 1) AS toCustomerId FROM Transaction ORDER BY Transaction.TransactionID DESC ;
 
 CREATE VIEW atmTransactionHistoryView AS
-SELECT fromAccountID,TimeStamp,Amount FROM ATMTransaction;
+SELECT fromAccountID,TimeStamp,Amount,(SELECT  CustomerId FROM Account JOIN ATMTransaction T on Account.AccountId = T.fromAccountID LIMIT 1) AS fromCustomerId FROM ATMTransaction;
 
 
 CREATE VIEW atmDetails AS
@@ -882,16 +882,21 @@ CREATE PROCEDURE creditTransferAccounts(IN fromAccount VARCHAR(20), IN toAccount
     SET withdrawals = (SELECT 	noOfWithdrawals FROM SavingsAccount WHERE AccountId = fromAccount) + 1;
     SET newBalance_from = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) - amount;
     SET newBalance_to = (SELECT AccountBalance FROM Account WHERE AccountId = fromAccount) + amount;
-    START TRANSACTION ;
-      INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
-      VALUES (fromAccount,toAccount,branchCode,amount);
-      UPDATE Account
-          SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
-      UPDATE Account
-          SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
-      UPDATE SavingsAccount
-            SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
-    COMMIT;
+    IF amount > 0 THEN
+      START TRANSACTION ;
+        INSERT INTO Transaction(`fromAccountID`,`toAccountID`,`branchCode`,`amount`)
+        VALUES (fromAccount,toAccount,branchCode,amount);
+        UPDATE Account
+            SET AccountBalance = newBalance_from WHERE AccountId = fromAccount;
+        UPDATE Account
+            SET AccountBalance = newBalance_to WHERE AccountId = toAccount;
+        UPDATE SavingsAccount
+              SET noOfWithdrawals = withdrawals WHERE AccountId = fromAccount;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'TRANSACTION FAILED';
+    END IF;
   END
 $$
 DELIMITER ;
@@ -908,7 +913,7 @@ CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN
     SET newBalance = newBalance - _amount;
     SET atmBalance = atmBalance - _amount;
     SET withdrawals = withdrawals + 1;
-    IF atmBalance >= 0 THEN
+    IF atmBalance >= 0 AND _amount > 0 THEN
       START TRANSACTION ;
         INSERT INTO ATMTransaction(`fromAccountID`,`ATMId`,`amount`)
         VALUES (fromAccount,atmId,_amount);
@@ -921,7 +926,7 @@ CREATE PROCEDURE atmWithdraw(IN fromAccount VARCHAR(20), IN atmId VARCHAR(20),IN
       COMMIT;
     ELSE
       SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'ATM HAS INSUFFICIENT FUNDS';
+      SET MESSAGE_TEXT = 'TRANSACTION FAILED';
     END IF ;
   END
 $$
