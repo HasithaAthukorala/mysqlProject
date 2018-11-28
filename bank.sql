@@ -864,7 +864,7 @@ CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
 CREATE VIEW transactionHistoryView AS
-SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.fromAccountID LIMIT 1) AS fromCustomerId ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.toAccountID LIMIT 1) AS toCustomerId FROM Transaction ORDER BY Transaction.TransactionID DESC ;
+SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM Account JOIN Transaction T on Account.AccountId = T.fromAccountID LIMIT 1) AS fromCustomerId ,(SELECT  CustomerId FROM Account JOIN Transaction T on Account.AccountId = T.toAccountID LIMIT 1) AS toCustomerId FROM Transaction ORDER BY Transaction.TransactionID DESC ;
 
 CREATE VIEW atmTransactionHistoryView AS
 SELECT fromAccountID,TimeStamp,Amount FROM ATMTransaction;
@@ -1120,7 +1120,7 @@ CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
       UPDATE pendingLoanStatus
           SET applicationStatus = 1 WHERE applicationID = _applicationID;
       INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
-      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/CAST(DATEDIFF(endDate,startDate)/30 AS INT),CAST(DATEDIFF(endDate,startDate)/30 AS INT),applicationID FROM loanapplicaton;
+      SELECT customerID,loanType,loanAmount,startDate,endDate,DATE_ADD(startDate, INTERVAL 30 DAY),loanAmount/CAST(DATEDIFF(endDate,startDate)/30 AS INT),CAST(DATEDIFF(endDate,startDate)/30 AS INT),applicationID FROM LoanApplicaton;
     COMMIT ;
   END
 $$
@@ -1252,7 +1252,7 @@ CREATE PROCEDURE `validate_online_loan`(IN customerID VARCHAR(20),
       CALL create_loanApplication(customerID, purpose, sourceOfFunds, collateralType, collateralNotes, customerID, loanType, loanAmount, startDate, endDate);
       SET applicationID = (SELECT applicationID FROM LoanApplicaton ORDER BY applicationID DESC LIMIT 1);
     COMMIT;
-    SET FDAmount = (SELECT amount FROM fixeddeposit WHERE AccountiD = fd);
+    SET FDAmount = (SELECT amount FROM FixedDeposit WHERE AccountiD = fd);
     IF  loanAmount > FDAmount*0.6 OR loanAmount > 500000
     THEN
       SIGNAL SQLSTATE '45000'
