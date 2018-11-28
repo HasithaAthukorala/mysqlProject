@@ -917,7 +917,6 @@ DELIMITER ;
 
 CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
 
-
 DELIMITER $$
  CREATE PROCEDURE createFixedDeposit(IN FDid VARCHAR(20),
                                     IN AccountId VARCHAR(20),
@@ -1089,8 +1088,6 @@ CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
 $$
 DELIMITER ;
 
-
-
 DELIMITER $$
 CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN purpose        TEXT,
@@ -1187,9 +1184,10 @@ CREATE USER IF NOT EXISTS 'guest'@'localhost' IDENTIFIED BY 'guest';
 GRANT SELECT ON bank.userLoginView TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
-GRANT INSERT ON bank.LoanApplicaton TO 'usr'@'localhost';
 GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
 GRANT SELECT ON bank.transactionHistoryView TO 'usr'@'localhost';
+GRANT EXECUTE ON bank.create_loanApplication TO 'usr'@'localhost';
+GRANT EXECUTE ON bank.validate_online_loan TO 'usr'@'localhost';
 
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
