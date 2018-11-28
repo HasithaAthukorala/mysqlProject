@@ -10,7 +10,6 @@ CREATE TABLE FDType (
 
 -- to validate fdtype
 DELIMITER $$
-
 CREATE PROCEDURE `check_fdtypes`(IN interest DECIMAL(13,2), IN time INT)
   BEGIN
     IF interest < 0
@@ -18,7 +17,6 @@ CREATE PROCEDURE `check_fdtypes`(IN interest DECIMAL(13,2), IN time INT)
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Interest is incorrect!';
     end if;
-
     IF time < 0
     THEN
       SIGNAL SQLSTATE '45000'
@@ -37,7 +35,6 @@ CREATE TRIGGER `check_fdtypes_before_insert`
   END$$
 DELIMITER ;
 
-
 CREATE TABLE Customer (
   CustomerId   VARCHAR(20),
   Address      TEXT NOT NULL,
@@ -47,8 +44,6 @@ CREATE TABLE Customer (
   CHECK (CHAR_LENGTH(PhoneNumber) = 10),
   PRIMARY KEY (CustomerId)
 );
-
-
 
 DELIMITER $$
 CREATE PROCEDURE `check_num`(IN phone VARCHAR(20))
@@ -81,8 +76,6 @@ CREATE TRIGGER `parts_before_update`
   END$$
 DELIMITER ;
 
-
-
 CREATE TABLE IndividualCustomer (
   CustomerId        VARCHAR(20),
   FirstName         TEXT                          NOT NULL,
@@ -96,7 +89,6 @@ CREATE TABLE IndividualCustomer (
 
 -- to validate birthdays
 DELIMITER $$
-
 CREATE PROCEDURE `check_birthday`(IN dob DATE)
   BEGIN
     IF dob > NOW()
@@ -125,8 +117,6 @@ CREATE TABLE Organization (
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId)
 );
 
-
-
 CREATE TABLE Interest (
   accountType    VARCHAR(20) PRIMARY KEY,
   interest       DECIMAL(13, 2) NOT NULL,
@@ -135,7 +125,6 @@ CREATE TABLE Interest (
 
 -- to validate interests and minimum balances
 DELIMITER $$
-
 CREATE PROCEDURE `check_rates_balances`(IN interest DECIMAL(13,2), IN minimum_bal DECIMAL(13,2))
   BEGIN
     IF interest < 0
@@ -143,7 +132,6 @@ CREATE PROCEDURE `check_rates_balances`(IN interest DECIMAL(13,2), IN minimum_ba
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Interest is incorrect!';
     end if;
-
     IF minimum_bal < 0
     THEN
       SIGNAL SQLSTATE '45000'
@@ -162,7 +150,6 @@ CREATE TRIGGER `check_rates_minimum_balance_when_insert`
     CALL check_rates_balances(new.interest, new.MinimumBalance);
   END$$
 DELIMITER ;
-
 
 CREATE TABLE Nominee (
   NomineeId VARCHAR(20) PRIMARY KEY,
@@ -191,7 +178,6 @@ CREATE TRIGGER `parts_before_update_nominee`
   END$$
 DELIMITER ;
 
-
 CREATE TABLE Branch (
   branchCode      VARCHAR(20) PRIMARY KEY,
   branchName      VARCHAR(20) NOT NULL,
@@ -207,7 +193,6 @@ CREATE TABLE Employee (
   address     TEXT        NOT NULL,
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode)
 );
-
 
 -- before insert to employee
 DELIMITER $$
@@ -237,7 +222,6 @@ CREATE TABLE BranchManager (
   FOREIGN KEY (employeeID) REFERENCES Employee (employeeID)
 );
 
-
 CREATE TABLE Account (
   AccountId      VARCHAR(20) NOT NULL,
   CustomerId     VARCHAR(20)   NOT NULL,
@@ -249,7 +233,6 @@ CREATE TABLE Account (
   FOREIGN KEY (branchCode) REFERENCES Branch (branchCode),
   FOREIGN KEY (NomineeId) REFERENCES Nominee (NomineeId)
 );
-
 
 CREATE TABLE SavingsAccount (
   AccountId       VARCHAR(20) NOT NULL,
@@ -267,7 +250,6 @@ CREATE TABLE LateLoans(
 );
 
 DELIMITER $$
-
 CREATE PROCEDURE `check_balance`(IN AccBalance DECIMAL(13,2), IN AccId VARCHAR(20))
   BEGIN
     DECLARE account_type VARCHAR(20);
@@ -279,7 +261,6 @@ CREATE PROCEDURE `check_balance`(IN AccBalance DECIMAL(13,2), IN AccId VARCHAR(2
       SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'check constraint on interest failed!';
     END IF;
-
     IF minbal > AccBalance
     THEN
       SIGNAL SQLSTATE '45000'
@@ -299,7 +280,6 @@ CREATE TRIGGER `check_account_balance_when_update`
 DELIMITER ;
 
 DELIMITER $$
-
 -- to validate no of withdrawals and account type
 CREATE PROCEDURE `update_savings_account`(IN noOfWithdrawals INT )
   BEGIN
@@ -314,7 +294,6 @@ CREATE PROCEDURE `update_savings_account`(IN noOfWithdrawals INT )
       SET MESSAGE_TEXT = 'Withdrawal limit has been exceeded...!';
     END IF;
   END$$
-
 DELIMITER ;
 
 -- when updating an savings account
@@ -329,7 +308,6 @@ CREATE TRIGGER `check_savings_account_when_update`
 DELIMITER ;
 
 DELIMITER $$
-
 -- to validate no of account type
 CREATE PROCEDURE `insert_savings_account`(IN account VARCHAR(20), IN type VARCHAR(20))
   BEGIN
@@ -337,7 +315,6 @@ CREATE PROCEDURE `insert_savings_account`(IN account VARCHAR(20), IN type VARCHA
     DECLARE  age INT;
     SET dob = (SELECT DateOfBirth from Account  inner join IndividualCustomer on Account.CustomerId = IndividualCustomer.CustomerId where Account.AccountId = account);
     SET age = DATEDIFF(CURDATE(),dob)/365;
-
     IF type = "Children"
       THEN
         IF age > 18
@@ -346,7 +323,6 @@ CREATE PROCEDURE `insert_savings_account`(IN account VARCHAR(20), IN type VARCHA
             SET MESSAGE_TEXT = 'Incorrect account type for this customer...!';
         END IF;
     END IF;
-
     IF type = "Teen" OR type = "Adult"
       THEN
         IF age < 18
@@ -355,7 +331,6 @@ CREATE PROCEDURE `insert_savings_account`(IN account VARCHAR(20), IN type VARCHA
             SET MESSAGE_TEXT = 'Incorrect account type for this customer...!';
         END IF;
     END IF;
-
     IF type = "Senior"
       THEN
         IF age < 60 OR age < 18
@@ -365,7 +340,6 @@ CREATE PROCEDURE `insert_savings_account`(IN account VARCHAR(20), IN type VARCHA
         END IF;
     END IF;
   END$$
-
 DELIMITER ;
 
 -- when inserting to an savings account
@@ -379,7 +353,6 @@ CREATE TRIGGER `check_savings_account_when_insert`
   END$$
 DELIMITER ;
 
-
 CREATE TABLE FixedDeposit (
   FDid      VARCHAR(20)   NOT NULL,
   AccountId VARCHAR(20)   NOT NULL,
@@ -392,8 +365,6 @@ CREATE TABLE FixedDeposit (
 );
 
 DELIMITER $$
-
-
 -- to validate fd amount
 CREATE PROCEDURE `check_fd_amount`(IN amount DECIMAL(13,2))
   BEGIN
@@ -403,7 +374,6 @@ CREATE PROCEDURE `check_fd_amount`(IN amount DECIMAL(13,2))
       SET MESSAGE_TEXT = 'FD amount should be greater than zero...!';
     END IF;
   END$$
-
 DELIMITER ;
 
 -- when inserting to a fd
@@ -416,7 +386,6 @@ CREATE TRIGGER `check_fd_when_insert`
     CALL check_fd_amount(new.amount);
   END$$
 DELIMITER ;
-
 
 CREATE TABLE Gurantor (
   gurantoID VARCHAR(20) NOT NULL,
@@ -448,8 +417,6 @@ CREATE TABLE LoanInterest (
   PRIMARY KEY (loanType)
 );
 
-
-
 CREATE TABLE LoanApplicaton (
   applicationID     INT                  NOT NULL AUTO_INCREMENT,
   gurrantorID       VARCHAR(20),
@@ -471,7 +438,6 @@ CREATE TABLE LoanApplicaton (
 
 # Validation for LoanInterest table
 DELIMITER $$
-
 CREATE PROCEDURE `check_LoanInterest`(IN interest DECIMAL(13,2), IN installmentDuration INT)
   BEGIN
     IF interest < 0
@@ -485,7 +451,6 @@ CREATE PROCEDURE `check_LoanInterest`(IN interest DECIMAL(13,2), IN installmentD
       SET MESSAGE_TEXT = 'check constraint on installmentDuration failed!';
     END IF;
   END$$
-
 DELIMITER ;
 
 DELIMITER $$
@@ -507,8 +472,6 @@ CREATE TRIGGER `LoanInterest_before_update`
     CALL check_LoanInterest(new.interest, new.installmentDuration);
   END$$
 DELIMITER ;
-
-# ....................................
 
 CREATE TABLE Loan (
   loanID               INT AUTO_INCREMENT   NOT NULL,
@@ -535,11 +498,8 @@ CREATE TABLE OnlineLoan (
 );
 
 -- validate online loan
-
-
 # validation for Loan table
 DELIMITER $$
-
 CREATE PROCEDURE `check_Loan`(IN loanAmount DECIMAL(13, 2), IN numberOfInstallments INT, IN nextInstallment DECIMAL(13, 2))
   BEGIN
     IF loanAmount < 0
@@ -558,7 +518,6 @@ CREATE PROCEDURE `check_Loan`(IN loanAmount DECIMAL(13, 2), IN numberOfInstallme
       SET MESSAGE_TEXT = 'check constraint on next installment failed!';
     END IF;
   END$$
-
 DELIMITER ;
 
 DELIMITER $$
@@ -581,8 +540,6 @@ CREATE TRIGGER `Loan_before_update`
   END$$
 DELIMITER ;
 
-# .......................
-
 CREATE TABLE LoanInstallment (
   installmentID        INT           NOT NULL AUTO_INCREMENT,
   loanID               INT,
@@ -594,7 +551,6 @@ CREATE TABLE LoanInstallment (
 
 # validation for LoanInstallment table
 DELIMITER $$
-
 CREATE PROCEDURE `check_LoanInstallment`(IN installmentAmount DECIMAL(13, 2))
   BEGIN
     IF installmentAmount < 0
@@ -603,7 +559,6 @@ CREATE PROCEDURE `check_LoanInstallment`(IN installmentAmount DECIMAL(13, 2))
       SET MESSAGE_TEXT = 'check constraint on interest failed!';
     END IF;
   END$$
-
 DELIMITER ;
 
 DELIMITER $$
@@ -625,7 +580,6 @@ CREATE TRIGGER `LoanInstallment_before_update`
     CALL check_LoanInstallment(new.installmentAmount);
   END$$
 DELIMITER ;
-
 
 CREATE TABLE ATMInformation (
   ATMId           varchar(20) PRIMARY KEY,
@@ -675,7 +629,6 @@ CREATE TABLE UserLogin (
   role      ENUM ("admin", "user", "employee"),
   PRIMARY KEY (id),
   FOREIGN KEY (CustomerId) REFERENCES Customer(CustomerId)
-
 );
 
 DELIMITER $$
@@ -709,7 +662,6 @@ CREATE TRIGGER `parts_before_update_password`
   END$$
 DELIMITER ;
 
-
 #Adding a transaction
 DELIMITER $$
 CREATE FUNCTION check_account_balance(old_balance DECIMAL(13, 2), transaction_amount DECIMAL(13, 2))
@@ -718,7 +670,6 @@ DETERMINISTIC
   BEGIN
     DECLARE remained_amount DECIMAL(13, 2);
     SET remained_amount = (old_balance - transaction_amount);
-
     IF remained_amount < 0
     THEN
       RETURN false;
@@ -763,8 +714,6 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
   END$$
 DELIMITER ;
 
-
-
 SELECT COUNT(*) AS 'result'
 FROM UserLogin
 WHERE EXISTS(SELECT passsword
@@ -772,7 +721,6 @@ WHERE EXISTS(SELECT passsword
              WHERE username = 'TESTOR01'
                AND passsword = MD5('0773842106')
                AND role = 'user');
-
 
 CREATE VIEW branchDetailView AS
 SELECT branchCode,branchName FROM Branch;
@@ -799,7 +747,6 @@ SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM Acco
 
 CREATE VIEW atmTransactionHistoryView AS
 SELECT fromAccountID,TimeStamp,Amount FROM ATMTransaction;
-
 
 CREATE VIEW atmDetails AS
 SELECT ATMId FROM ATMInformation;
@@ -883,8 +830,6 @@ CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
   END
  $$
 DELIMITER ;
-
-
 
 DELIMITER $$
  CREATE PROCEDURE createFixedDeposit(IN FDid VARCHAR(20),
@@ -974,38 +919,26 @@ END
 $$
 DELIMITER ;
 
-
 # Loan application
 DELIMITER $$
-
 CREATE FUNCTION check_acount
   (id Varchar(20))
   RETURNS boolean
   BEGIN
     DECLARE result boolean;
     DECLARE newID INT;
-
     SELECT COUNT(CustomerId) into newID from Customer WHERE CustomerId = id;
-
     IF newID > 0
     then
       SET result = TRUE;
     ELSE
       SET result = FALSE;
     end if;
-
-
     RETURN result;
-
   END $$
-
 DELIMITER ;
 
 DELIMITER $$
-
-CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
-GRANT ALL ON bank.* TO 'adm'@'localhost';
-
 CREATE PROCEDURE update_loanCount(id VARCHAR(20))
   BEGIN
     DECLARE count INT(2);
@@ -1013,39 +946,30 @@ CREATE PROCEDURE update_loanCount(id VARCHAR(20))
     SET count = count + 1;
     UPDATE Gurantor SET NoOfLoans = count WHERE gurantoID = id;
   END $$
-
 DELIMITER ;
 
 DELIMITER $$
-
 CREATE FUNCTION check_gurantor
   (id Varchar(20))
   RETURNS boolean
   BEGIN
     DECLARE result boolean;
     DECLARE newID INT;
-
     SELECT COUNT(gurantoID) into newID from Gurantor WHERE gurantoID = id;
-
     IF newID > 0
     then
       SET result = TRUE;
     ELSE
       SET result = FALSE;
     end if;
-
-
     RETURN result;
-
   END $$
-
 DELIMITER ;
 
 DELIMITER $$
 CREATE PROCEDURE approveLoanApplication(IN _applicationID INT(11))
   BEGIN
     START TRANSACTION ;
-
       UPDATE pendingLoanStatus
           SET applicationStatus = 1 WHERE applicationID = _applicationID;
       INSERT INTO Loan (customerID, loanType, loanAmount, startDate, endDate, nextInstallmentDate, nextInstallment, numberOfInstallments, applicationID)
@@ -1068,11 +992,7 @@ CREATE PROCEDURE payLoanInstallment(IN _loanID INT(11))
 $$
 DELIMITER ;
 
-
-
-
 DELIMITER $$
-
 CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                                         IN purpose        TEXT,
                                         IN sourceOfFunds  TEXT,
@@ -1192,15 +1112,9 @@ CREATE PROCEDURE `validate_online_loan`(IN customerID VARCHAR(20),
         SET _loanID = (SELECT loanID FROM Loan ORDER BY loanID DESC LIMIT 1);
         INSERT INTO `OnlineLoan`(`loanID`, `FDid`) VALUES (_loanID,fd);
       COMMIT ;
-
       CALL approveLoanApplication(applicationID);
-
-
     END IF;
-
   END$$
-
-
 DELIMITER ;
 
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
@@ -1235,51 +1149,36 @@ INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Adult",10,1000);
 INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
-INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
-
+INSERT INTO `FDType`(`typeId`, `interest`, `time`)
+VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
 INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
 VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
-
 INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
 VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
-
-INSERT INTO `ATMInformation` (ATMId, OfficerInCharge, location, branchCode, Amount) VALUES ('ATM0001','EMP001','atmlocation1','BRHORANA001',20000);
+INSERT INTO `ATMInformation` (ATMId, OfficerInCharge, location, branchCode, Amount)
+VALUES ('ATM0001','EMP001','atmlocation1','BRHORANA001',20000);
 # INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 # VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
-
-
 INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
 VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
-
-INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
-
-
+INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`)
+VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
 INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
 VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
-
 INSERT INTO `BranchManager` (`branchID`, `employeeID`)
 VALUES ('BRHORANA001', 'EMP001');
-
-
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
 VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
-
 INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
 VALUES ('ACC001',"Adult");
-
 BEGIN;
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
 VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
-
 INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
 VALUES ('ACC002',"Teen");
 COMMIT;
-
 UPDATE `Account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
 UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
-
-
-
 # INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
 # VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
 #
@@ -1289,12 +1188,10 @@ UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 
 CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
 CALL createFixedDeposit('FD0001','ACC004','FDT001',50000.00);
-INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
-
+INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`)
+VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
 call payLoanInstallment(1);
-
 CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",1000.00,"2018-11-29","2019-11-29");
 CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",2000.00,"2018-11-29","2019-11-29");
 CALL create_loanApplication("ABC01","Loan","sda","asda","sadas","ABC02","1",50000.00,"2018-11-28","2019-11-28");
-
 CALL approveLoanApplication(1);
