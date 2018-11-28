@@ -864,7 +864,11 @@ CREATE VIEW pendingLoanStatus AS
 SELECT applicationID, applicationStatus FROM LoanApplicaton;
 
 CREATE VIEW transactionHistoryView AS
-SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.fromAccountID) AS fromCustomerId ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.toAccountID) AS toCustomerId FROM Transaction ORDER BY Transaction.TransactionID DESC ;
+SELECT fromAccountID,toAccountID,TimeStamp,Amount ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.fromAccountID LIMIT 1) AS fromCustomerId ,(SELECT  CustomerId FROM account JOIN Transaction T on Account.AccountId = T.toAccountID LIMIT 1) AS toCustomerId FROM Transaction ORDER BY Transaction.TransactionID DESC ;
+
+CREATE VIEW atmTransactionHistoryView AS
+SELECT fromAccountID,TimeStamp,Amount FROM ATMTransaction;
+
 
 CREATE VIEW atmDetails AS
 SELECT ATMId FROM ATMInformation;
@@ -1292,6 +1296,7 @@ GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
 GRANT SELECT ON bank.transactionHistoryView TO 'usr'@'localhost';
 
 GRANT SELECT ON bank.atmDetails TO 'usr'@'localhost';
+GRANT SELECT ON bank.atmTransactionHistoryView TO 'usr'@'localhost';
 GRANT EXECUTE ON PROCEDURE  bank.create_loanApplication TO 'usr'@'localhost';
 GRANT EXECUTE ON PROCEDURE  bank.validate_online_loan TO 'usr'@'localhost';
 
