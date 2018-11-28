@@ -374,12 +374,7 @@ CREATE TABLE LoanApplicaton (
   FOREIGN KEY (gurrantorID) REFERENCES Gurantor (nicNumber)
 );
 
-CREATE TABLE LoanInterest (
-  loanType            ENUM ("1", "2", "3"),
-  interest            FLOAT NOT NULL,
-  installmentDuration INT   NOT NULL,
-  PRIMARY KEY (loanType)
-);
+
 
 # Validation for LoanInterest table
 DELIMITER $$
@@ -672,12 +667,7 @@ CREATE TRIGGER `parts_before_update_transaction_normal`
   END$$
 DELIMITER ;
 
-#Insert Data
-INSERT INTO `UserLogin` (`id`, `username`, `CustomerId`, `passsword`, `role`)
-VALUES ('1', 'TESTOR01','ABC01', MD5('0773842106'), 'user');
 
-INSERT INTO `UserLogin` (`id`, `username`, `CustomerId`, `passsword`, `role`)
-VALUES (NULL , 'tester','ABC01', MD5('12345'), 'user');
 
 SELECT COUNT(*) AS 'result'
 FROM UserLogin
@@ -730,10 +720,6 @@ VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
 
 INSERT INTO `savingsaccount`(`AccountId`, `accountType`)
 VALUES ('ACC001',"Adult");
-INSERT INTO `Transaction` (`fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
-
-
 
 BEGIN;
 INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
@@ -746,8 +732,7 @@ COMMIT;
 UPDATE `account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
 UPDATE `account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
 
-INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
+
 
 # INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
 # VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
@@ -949,3 +934,11 @@ END $$
 
 DELIMITER ;
 
+# ROLES AND PRIVILEGES
+CREATE ROLE 'user','admin','employee','guest';
+
+GRANT SELECT ON bank.userloginview TO 'guest';
+GRANT ALL ON bank.* TO 'admin';
+GRANT SELECT ON bank.* TO 'employee';
+GRANT EXECUTE ON bank.* TO 'employee';
+GRANT INSERT ON bank.loanapplicaton TO 'user';
