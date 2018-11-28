@@ -318,12 +318,10 @@ DELIMITER ;
 
 
 CREATE TABLE Gurantor (
-  nicNumber VARCHAR(10) NOT NULL,
-  name      varchar(20) NOT NULL,
-  address   TEXT        NOT NULL,
-  phone     VARCHAR(10) NOT NULL,
+  gurantoID VARCHAR(20) NOT NULL,
   NoOfLoans INT(2),
-  PRIMARY KEY (nicNumber)
+  PRIMARY KEY (gurantoID),
+  FOREIGN KEY (gurantoID) REFERENCES Customer (CustomerId)
 );
 
 CREATE TABLE LoanInterest (
@@ -335,7 +333,7 @@ CREATE TABLE LoanInterest (
 
 CREATE TABLE LoanApplicaton (
   applicationID     INT     NOT NULL AUTO_INCREMENT,
-  gurrantorID       VARCHAR(10),
+  gurrantorID       VARCHAR(20),
   purpose           TEXT    NOT NULL,
   sourceOfFunds     TEXT    NOT NULL,
   collateralType    TEXT    NOT NULL,
@@ -350,7 +348,7 @@ CREATE TABLE LoanApplicaton (
   nextInstallment      DECIMAL(13, 2)       NOT NULL,
   numberOfInstallments INT                  NOT NULL,
   PRIMARY KEY (applicationID),
-  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (nicNumber),
+  FOREIGN KEY (gurrantorID) REFERENCES Gurantor (gurantoID),
   FOREIGN KEY (customerID) REFERENCES Customer(CustomerId),
   FOREIGN KEY (loanType) REFERENCES LoanInterest(loanType)
 );
@@ -854,4 +852,6 @@ RETURN result;
 END $$
 
 DELIMITER ;
+
+
 
