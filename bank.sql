@@ -153,7 +153,7 @@ CREATE PROCEDURE `check_balance`(IN AccBalance FLOAT, IN AccId VARCHAR(20))
     DECLARE account_type VARCHAR(20);
     DECLARE minbal FLOAT(100,4);
     SET account_type = (SELECT accountType from SavingsAccount  where AccountId = AccId);
-    SET minbal = (SELECT MinimumBalance from interest where accountType = account_type);
+    SET minbal = (SELECT MinimumBalance from Interest where accountType = account_type);
     IF AccBalance  < 0
     THEN
       SIGNAL SQLSTATE '45000'
@@ -564,19 +564,19 @@ VALUES ('ACC002', 'ABC01', 'BRHORANA001', '7000.0000', 'NOM1234');
 INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
 VALUES ('TR001', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '8000.0000');
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Children",12,0);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
  VALUES ("Teen",11,500);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Adult",10,1000);
 
-INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
+INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
 
-INSERT INTO `fdtype`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
+INSERT INTO `FDType`(`typeId`, `interest`, `time`) VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
 
 CREATE VIEW branchDetailView AS
 SELECT branchCode,branchName FROM Branch;
@@ -672,9 +672,9 @@ CREATE EVENT savingAccountInterestCalculationEvent
     BEGIN
       START TRANSACTION ;
       UPDATE account
-        SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM SavingsAccount left join interest on SavingsAccount.accountType = Interest.accountType where Account.AccountId = SavingsAccount.AccountId)
+        SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM SavingsAccount left join Interest on SavingsAccount.accountType = Interest.accountType where Account.AccountId = SavingsAccount.AccountId)
         WHERE AccountId IN (
-            SELECT AccountId FROM savingsaccount
+            SELECT AccountId FROM SavingsAccount
             );
       UPDATE SavingsAccount
           SET noOfWithdrawals = 0;
