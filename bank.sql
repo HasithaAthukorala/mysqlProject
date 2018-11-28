@@ -1118,8 +1118,8 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
       THEN
         IF check_gurantor(gurrantorID)
         THEN
-          SELECT interest INTO precentage FROM LoanInterest WHERE loanType=loantype;
-          SET amount = amount*((precentage+100)/100);
+          SELECT interest INTO precentage FROM LoanInterest WHERE loanType=loantype LIMIT 1;
+          SET amount = loanAmount*((precentage+100)/100);
           START TRANSACTION ;
           CALL update_loanCount(gurrantorID);
           INSERT INTO `LoanApplicaton` (`gurrantorID`,
@@ -1146,8 +1146,8 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
                   endDate);
           COMMIT ;
         ELSE
-          SELECT interest INTO precentage FROM LoanInterest WHERE loanType=loantype;
-          SET amount = amount*((precentage+100)/100);
+          SELECT interest INTO precentage FROM LoanInterest WHERE loanType=loantype LIMIT 1;
+          SET amount = loanAmount*((precentage+100)/100);
           START TRANSACTION ;
           INSERT INTO Gurantor VALUES (gurrantorID, 1);
           INSERT INTO `LoanApplicaton` (`gurrantorID`,
@@ -1186,6 +1186,7 @@ CREATE PROCEDURE create_loanApplication(IN gurrantorID    VARCHAR(20),
 $$
 DELIMITER ;
 
+
 CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
 GRANT SELECT ON bank.* TO 'emp'@'localhost';
 GRANT EXECUTE ON bank.* TO 'emp'@'localhost';
@@ -1194,11 +1195,13 @@ CREATE USER IF NOT EXISTS 'guest'@'localhost' IDENTIFIED BY 'guest';
 GRANT SELECT ON bank.userLoginView TO 'guest'@'localhost';
 
 CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
+
 GRANT SELECT ON bank.customerDetailView TO 'usr'@'localhost';
 GRANT SELECT ON bank.transactionHistoryView TO 'usr'@'localhost';
-GRANT EXECUTE ON bank.create_loanApplication TO 'usr'@'localhost';
-GRANT EXECUTE ON bank.validate_online_loan TO 'usr'@'localhost';
+
 GRANT SELECT ON bank.atmDetails TO 'usr'@'localhost';
+GRANT EXECUTE ON PROCEDURE  bank.create_loanApplication TO 'usr'@'localhost';
+GRANT EXECUTE ON PROCEDURE  bank.validate_online_loan TO 'usr'@'localhost';
 
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
