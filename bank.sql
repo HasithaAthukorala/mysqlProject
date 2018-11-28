@@ -564,3 +564,69 @@ VALUES ("Adult",10,1000);
 INSERT INTO `interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
 
+CREATE VIEW branchDetailView AS
+SELECT branchCode,branchName FROM Branch;
+
+#SELECT * FROM branchDetailView;
+
+CREATE VIEW accountDetailsView AS
+SELECT AccountID,customerID,branchCode,AccountBalance,NomineeId FROM Account;
+
+CREATE VIEW userLoginView AS
+SELECT username,passsword,role FROM UserLogin;
+
+CREATE VIEW accountTypeDetails AS
+SELECT accountType FROM Interest;
+
+DELIMITER $$
+CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
+                                    IN CustomerId VARCHAR(20),
+                                    IN branchCode VARCHAR(20),
+                                    IN accountBalance DECIMAL(13,2),
+                                    IN NomineeId VARCHAR(20),
+                                    IN accountType VARCHAR(20))
+  BEGIN
+    # CHECK MINIMUM BALANCE
+    DECLARE minimumBlance DECIMAL(13,2);
+    SELECT MinimumBalance INTO minimumBlance FROM Interest WHERE Interest.accountType = accountType;
+    IF minimumBlance >= accountBalance THEN
+      START TRANSACTION ;
+        INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
+        VALUES (accountId,CustomerId,branchCode,accountBalance,NomineeId);
+        INSERT INTO `SavingsAccount` (`AccountId`,`noOfWithdrawals`,`accountType`)
+        VALUES (accountId,0,accountType);
+      COMMIT ;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'ACCOUNT BALANCE IS LESS THAN MINIMUM BALANCE OR ACCOUNT TYPE IS INVALID';
+    END IF ;
+  END
+ $$
+DELIMITER ;
+
+CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
+
+SET GLOBAL event_scheduler = 1;
+
+DELIMITER $$
+CREATE EVENT savingAccountInterestCalculationEvent
+  ON SCHEDULE EVERY '1' MONTH
+  STARTS '2018-12-01 00:00:00'
+  DO
+    BEGIN
+      START TRANSACTION ;
+      UPDATE account
+        SET AccountBalance = (SELECT AccountBalance * (1 + (interest/100)) FROM SavingsAccount left join interest on SavingsAccount.accountType = Interest.accountType where Account.AccountId = SavingsAccount.AccountId)
+        WHERE AccountId IN (
+            SELECT AccountId FROM savingsaccount
+            );
+      UPDATE SavingsAccount
+          SET noOfWithdrawals = 0;
+      COMMIT ;
+END
+$$
+DELIMITER ;
+
+# Time based events
+SELECT * FROM Account;
+SELECT * FROM SavingsAccount;
