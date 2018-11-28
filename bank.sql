@@ -937,11 +937,15 @@ END $$
 
 DELIMITER ;
 
-# ROLES AND PRIVILEGES
-CREATE ROLE 'user','admin','employee','guest';
+CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
+GRANT ALL ON bank.* TO 'adm'@'localhost';
 
-GRANT SELECT ON bank.userloginview TO 'guest';
-GRANT ALL ON bank.* TO 'admin';
-GRANT SELECT ON bank.* TO 'employee';
-GRANT EXECUTE ON bank.* TO 'employee';
-GRANT INSERT ON bank.loanapplicaton TO 'user';
+CREATE USER IF NOT EXISTS 'emp'@'localhost' IDENTIFIED BY 'emp';
+GRANT SELECT ON bank.* TO 'emp'@'localhost';
+GRANT EXECUTE ON bank.* TO 'emp'@'localhost';
+
+CREATE USER IF NOT EXISTS 'guest'@'localhost' IDENTIFIED BY 'guest';
+GRANT SELECT ON bank.userloginview TO 'guest'@'localhost';
+
+CREATE USER IF NOT EXISTS 'usr'@'localhost' IDENTIFIED BY 'usr';
+GRANT INSERT ON bank.loanapplicaton TO 'usr'@'localhost';
