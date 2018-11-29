@@ -811,6 +811,25 @@ $$
 DELIMITER ;
 
 DELIMITER $$
+CREATE PROCEDURE deposite(IN toAccount VARCHAR(20),IN _amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance DECIMAL(13,2);
+    SELECT (AccountBalance ) INTO newBalance FROM Account WHERE AccountId = fromAccount LIMIT 1;
+    SET newBalance = newBalance + _amount;
+    IF  _amount > 0 THEN
+      START TRANSACTION ;
+        UPDATE Account
+            SET AccountBalance = newBalance WHERE AccountId = toAccount;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'TRANSACTION FAILED';
+    END IF ;
+  END
+$$
+DELIMITER ;
+
+DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
                                     IN CustomerId VARCHAR(20),
                                     IN branchCode VARCHAR(20),
