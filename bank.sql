@@ -226,7 +226,7 @@ CREATE TABLE Account (
   AccountId      VARCHAR(20) NOT NULL,
   CustomerId     VARCHAR(20)   NOT NULL,
   branchCode     VARCHAR(20)   NOT NULL,
-  AccountBalance DECIMAL(13, 2) NOT NULL default 0,
+  AccountBalance DECIMAL(13, 2) NOT NULL,
   NomineeId      VARCHAR(20)   NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId),
@@ -236,7 +236,7 @@ CREATE TABLE Account (
 
 CREATE TABLE SavingsAccount (
   AccountId       VARCHAR(20) NOT NULL,
-  noOfWithdrawals INT    NOT NULL default 0,
+  noOfWithdrawals INT    NOT NULL,
   accountType     VARCHAR(20) NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (AccountId) REFERENCES Account (AccountId),
@@ -811,6 +811,25 @@ $$
 DELIMITER ;
 
 DELIMITER $$
+CREATE PROCEDURE deposite(IN toAccount VARCHAR(20),IN _amount DECIMAL(13,2))
+  BEGIN
+    DECLARE newBalance DECIMAL(13,2);
+    SELECT (AccountBalance ) INTO newBalance FROM Account WHERE AccountId = fromAccount LIMIT 1;
+    SET newBalance = newBalance + _amount;
+    IF  _amount > 0 THEN
+      START TRANSACTION ;
+        UPDATE Account
+            SET AccountBalance = newBalance WHERE AccountId = toAccount;
+      COMMIT;
+    ELSE
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'TRANSACTION FAILED';
+    END IF ;
+  END
+$$
+DELIMITER ;
+
+DELIMITER $$
 CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
                                     IN CustomerId VARCHAR(20),
                                     IN branchCode VARCHAR(20),
@@ -821,7 +840,7 @@ CREATE PROCEDURE createSavingAccount(IN accountId VARCHAR(20),
     # CHECK MINIMUM BALANCE
     DECLARE minimumBlance DECIMAL(13,2);
     SELECT MinimumBalance INTO minimumBlance FROM Interest WHERE Interest.accountType = accountType;
-    IF minimumBlance >= accountBalance THEN
+    IF minimumBlance <= accountBalance THEN
       START TRANSACTION ;
         INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `AccountBalance`, `NomineeId`)
         VALUES (accountId,CustomerId,branchCode,accountBalance,NomineeId);
@@ -1142,7 +1161,8 @@ GRANT EXECUTE ON PROCEDURE  bank.validate_online_loan TO 'usr'@'localhost';
 CREATE USER IF NOT EXISTS 'adm'@'localhost' IDENTIFIED BY 'adm';
 GRANT ALL ON bank.* TO 'adm'@'localhost';
 
-INSERT INTO Customer VALUES ("ABC02", "Matara", "0716492763", "kas@gmail.com");
+# insert queries
+
 INSERT INTO LoanInterest VALUES ("1",5,12);
 INSERT INTO LoanInterest VALUES ("2",10,24);
 INSERT INTO LoanInterest VALUES ("3",15,36);
@@ -1156,47 +1176,93 @@ INSERT INTO `Interest`(`accountType`, `interest`, `MinimumBalance`)
 VALUES ("Senior",13,1000);
 INSERT INTO `FDType`(`typeId`, `interest`, `time`)
 VALUES ("FDT001",13,6), ("FDT002",14,12), ("FDT003",15,36);
-INSERT INTO `Branch` (`branchCode`, `branchName`, `branchManagerID`)
-VALUES ('BRHORANA001', 'HORANA-001', 'EMP001');
-INSERT INTO `Employee` (`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`)
-VALUES ('EMP001', 'BRHORANA001', 'Asela', 'Wanigasooriya', '1996-12-07', '285E, Anderson road, Horana.');
-INSERT INTO `ATMInformation` (ATMId, OfficerInCharge, location, branchCode, Amount)
-VALUES ('ATM0001','EMP001','atmlocation1','BRHORANA001',20000);
-# INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
-# VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '077384210', 'anyone@gmail.com');
-INSERT INTO `Customer` (`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`)
-VALUES ('ABC01', 'NO:28,Colombo road,Colombo', '0773842106', 'anyone@gmail.com');
-INSERT INTO `IndividualCustomer` (`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`)
-VALUES ('ABC01', 'Yasaa', 'Boya', '1995-1-5', 'Unmarried', '9636549632');
-INSERT INTO `Nominee` (`NomineeId`, `Name`, `Address`, `Phone`)
-VALUES ('NOM1234', 'Nominee 1', 'Test address', '0773842108');
-INSERT INTO `BranchManager` (`branchID`, `employeeID`)
-VALUES ('BRHORANA001', 'EMP001');
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
-VALUES ('ACC001', 'ABC01', 'BRHORANA001', 'NOM1234');
-INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
-VALUES ('ACC001',"Adult");
-BEGIN;
-INSERT INTO `Account` (`AccountId`, `CustomerId`, `branchCode`, `NomineeId`)
-VALUES ('ACC002', 'ABC01', 'BRHORANA001', 'NOM1234');
-INSERT INTO `SavingsAccount`(`AccountId`, `accountType`)
-VALUES ('ACC002',"Teen");
-COMMIT;
-UPDATE `Account` SET `AccountBalance`='8000.000' WHERE AccountId = "ACC001";
-UPDATE `Account` SET `AccountBalance`='7000.000' WHERE AccountId = "ACC002";
-# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-# VALUES ('TR003', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '4000.0000');
-#
-#
-# INSERT INTO `Transaction` (`TransactionID`, `fromAccountID`, `toAccountID`, `branchCode`, `TimeStamp`, `Amount`)
-# VALUES ('TR004', 'ACC001', 'ACC002', 'BRHORANA001', NOW(), '1000.0000');
 
-CALL createSavingAccount('ACC004','ABC01','BRHORANA001',1000.00,'NOM1234','Adult');
-CALL createFixedDeposit('FD0001','ACC004','FDT001',50000.00);
-INSERT INTO `ATMCard` (`cardID`, `AccountID`, `startDate`, `ExpireDate`)
-VALUES ('1234123412341234', 'ACC001', '2017-03-15', '2019-03-15');
-call payLoanInstallment(1);
-CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",1000.00,"2018-11-29","2019-11-29");
-CALL validate_online_loan("ABC01","sad","sdfsd","sad","sdf","1","FD0001",2000.00,"2018-11-29","2019-11-29");
-CALL create_loanApplication("ABC01","Loan","sda","asda","sadas","ABC02","1",50000.00,"2018-11-28","2019-11-28");
-CALL approveLoanApplication(1);
+INSERT INTO `Branch`(`branchCode`, `branchName`, `branchManagerID`) VALUES ("BRMoratuwa002","Moratuwa-002","EMP002");
+INSERT INTO `Branch`(`branchCode`, `branchName`, `branchManagerID`) VALUES ("BRKaluthara003","Kaluthara-003","EMP003");
+INSERT INTO `Branch`(`branchCode`, `branchName`, `branchManagerID`) VALUES ("BRPanadura","Panadura-004","EMP004");
+INSERT INTO `Branch`(`branchCode`, `branchName`, `branchManagerID`) VALUES ("BRMMatara","Matara-001","EMP005");
+INSERT INTO `Branch`(`branchCode`, `branchName`, `branchManagerID`) VALUES ("BRGalle","Galle-006","EMP006");
+
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP002", "BRMoratuwa002", "Kamal", "Perera", "1985-05-16", "Matara");
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP003", "BRKaluthara003", "Kamal", "Perera", "1985-05-16", "Matara");
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP004", "BRPanadura", "Kamal", "Perera", "1985-05-16", "Matara");
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP005", "BRMMatara", "Kamal", "Perera", "1985-05-16", "Matara");
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP006", "BRGalle", "Kamal", "Perera", "1985-05-16", "Matara");
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP007", "BRMMatara", "Kamal", "Perera", "1985-05-16", "Matara");
+INSERT INTO `Employee`(`employeeID`, `branchCode`, `firstName`, `LastName`, `dateOfBirth`, `address`) VALUES ("EMP008", "BRGalle", "Kamal", "Perera", "1985-05-16", "Matara");
+
+INSERT INTO `BranchManager`(`branchID`, `employeeID`) VALUES ("BRMoratuwa002","EMP002");
+INSERT INTO `BranchManager`(`branchID`, `employeeID`) VALUES ("BRKaluthara003","EMP003");
+INSERT INTO `BranchManager`(`branchID`, `employeeID`) VALUES ("BRPanadura","EMP004");
+INSERT INTO `BranchManager`(`branchID`, `employeeID`) VALUES ("BRMMatara","EMP005");
+INSERT INTO `BranchManager`(`branchID`, `employeeID`) VALUES ("BRGalle","EMP006");
+
+START TRANSACTION;
+INSERT INTO `Customer`(`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`) VALUES ("ABC03","NO. 5,Horana.","0114563256","anyone.gmail.com");
+INSERT INTO `IndividualCustomer`(`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ("ABC03","kamal","perera","1687-11-5","married","963852741v");
+COMMIT;
+
+START TRANSACTION;
+INSERT INTO `Customer`(`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`) VALUES ("ABC04","NO. 6, Matara.","0114563756","anyone.gmail.com");
+INSERT INTO `IndividualCustomer`(`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ("ABC04","kamal","perera","1687-11-5","married","963857841v");
+COMMIT;
+
+START TRANSACTION;
+INSERT INTO `Customer`(`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`) VALUES ("ABC05","NO. 7, Galle.","0114543256","anyone.gmail.com");
+INSERT INTO `IndividualCustomer`(`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ("ABC05","kamal","perera","1687-11-5","married","9139852741v");
+COMMIT;
+
+START TRANSACTION;
+INSERT INTO `Customer`(`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`) VALUES ("ABC06","NO. 8, Kaluthara.","0117563256","anyone.gmail.com");
+INSERT INTO `IndividualCustomer`(`CustomerId`, `FirstName`, `LastName`, `DateOfBirth`, `EmployementStatus`, `NIC`) VALUES ("ABC06", "kamal","perera","1687-11-5","unmarried","963962741v");
+COMMIT;
+
+
+START TRANSACTION;
+INSERT INTO `Customer`(`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`) VALUES ("ABC07","NO. 9, Maho.","0114563966","anyone.gmail.com");
+INSERT INTO `Organization`(`CustomerId`, `organizationName`) VALUES ("ABC07","wahid constructions");
+COMMIT;
+
+START TRANSACTION;
+INSERT INTO `Customer`(`CustomerId`, `Address`, `PhoneNumber`, `EmailAddress`) VALUES ("ABC08","NO. 45, Maalabe.","0784563256","anyone.gmail.com");
+INSERT INTO `Organization`(`CustomerId`, `organizationName`) VALUES ("ABC08","solid builders");
+COMMIT;
+
+
+INSERT INTO `Nominee`(`NomineeId`, `Name`, `Address`, `Phone`) VALUES ("NOM0001","Kasun Sankalpa","NO. 45, Horana","0719623587");
+INSERT INTO `Nominee`(`NomineeId`, `Name`, `Address`, `Phone`) VALUES ("NOM0002","Dasun Sankalpa","NO. 42, Nawala","0719853587");
+INSERT INTO `Nominee`(`NomineeId`, `Name`, `Address`, `Phone`) VALUES ("NOM0003","Kasun Sanka","NO. 45, Gampaha","0719373587");
+
+
+SELECT MinimumBalance  FROM Interest WHERE Interest.accountType = "Adult";
+
+CALL createSavingAccount("ACC005","ABC06","BRPanadura",5000,"NOM0001","Adult");
+CALL createSavingAccount("ACC006","ABC07","BRGalle",1000,"NOM0002","Children");
+CALL createSavingAccount("ACC007","ABC08","BRPanadura",6000,"NOM0003","Teen");
+CALL createSavingAccount("ACC008","ABC05","BRGalle",2000,"NOM0003","Teen");
+CALL createSavingAccount("ACC009","ABC04","BRGalle",6000,"NOM0002","Senior");
+
+INSERT INTO `ATMCard`(`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ("1546985645628951","ACC005","2019-11-29","2021-11-29");
+INSERT INTO `ATMCard`(`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ("1546985645628952","ACC007","2019-11-29","2021-11-29");
+INSERT INTO `ATMCard`(`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ("1546985645628953","ACC008","2019-11-29","2021-11-29");
+INSERT INTO `ATMCard`(`cardID`, `AccountID`, `startDate`, `ExpireDate`) VALUES ("1546985645628954","ACC009","2019-11-29","2021-11-29");
+
+INSERT INTO `ATMInformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM0002","EMP002","atmLocation2","BRMoratuwa002",50000.00);
+INSERT INTO `ATMInformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM0003","EMP003","atmLocation3","BRKaluthara003",50000.00);
+INSERT INTO `ATMInformation`(`ATMId`, `OfficerInCharge`, `location`, `branchCode`, `Amount`) VALUES ("ATM0004","EMP004","atmLocation4","BRPanadura",50000.00);
+
+CALL createFixedDeposit ("FD0002", "ACC005", "FDT001", 60000.00);
+CALL createFixedDeposit ("FD0003", "ACC006", "FDT002", 60000.00);
+CALL createFixedDeposit ("FD0004", "ACC007", "FDT003", 60000.00);
+
+
+CALL create_loanApplication("ABC07","Loan","sda","asda","sadas","ABC03","1",50000.00,"2018-11-28","2019-11-28");
+CALL create_loanApplication("ABC03","Loan","sda","asda","sadas","ABC04","2",50000.00,"2018-11-28","2019-11-28");
+CALL create_loanApplication("ABC04","Loan","sda","asda","sadas","ABC05","3",50000.00,"2018-11-28","2019-11-28");
+CALL create_loanApplication("ABC05","Loan","sda","asda","sadas","ABC06","1",50000.00,"2018-11-28","2019-11-28");
+CALL create_loanApplication("ABC06","Loan","sda","asda","sadas","ABC07","2",50000.00,"2018-11-28","2019-11-28");
+
+CALL validate_online_loan("ABC05","sad","sdfsd","sad","sdf","1","FD0002",1000.00,"2018-11-29","2019-11-29");
+CALL validate_online_loan("ABC06","sad","sdfsd","sad","sdf","2","FD0003",1000.00,"2018-11-29","2019-11-29");
+CALL validate_online_loan("ABC07","sad","sdfsd","sad","sdf","3","FD0004",1000.00,"2018-11-29","2019-11-29");
+
