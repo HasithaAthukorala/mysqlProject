@@ -226,7 +226,7 @@ CREATE TABLE Account (
   AccountId      VARCHAR(20) NOT NULL,
   CustomerId     VARCHAR(20)   NOT NULL,
   branchCode     VARCHAR(20)   NOT NULL,
-  AccountBalance DECIMAL(13, 2) NOT NULL default 0,
+  AccountBalance DECIMAL(13, 2) NOT NULL,
   NomineeId      VARCHAR(20)   NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (CustomerId) REFERENCES Customer (CustomerId),
@@ -236,7 +236,7 @@ CREATE TABLE Account (
 
 CREATE TABLE SavingsAccount (
   AccountId       VARCHAR(20) NOT NULL,
-  noOfWithdrawals INT    NOT NULL default 0,
+  noOfWithdrawals INT    NOT NULL,
   accountType     VARCHAR(20) NOT NULL,
   PRIMARY KEY (AccountId),
   FOREIGN KEY (AccountId) REFERENCES Account (AccountId),
